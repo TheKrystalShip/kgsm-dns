@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Dns/Dns.csproj" />
+  <Project Path="src/Dns.Anchor/Anchor.csproj" />
+  <Project Path="tests/Dns.Tests/Dns.Tests.csproj" />
+  <Project Path="tests/Dns.Anchor.Tests/Dns.Anchor.Tests.csproj" />
+</Solution>

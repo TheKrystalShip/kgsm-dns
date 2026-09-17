@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "id": "dns-anchor",
+  "displayName": "DNS anchor",
+  "unit": "kgsm-dns.service",
+  "role": "Publishes the names a cluster is reached at — members, capabilities and game servers — and is the only member holding a credential for the zone.",
+  "onDemand": false,
+  "applyMode": "restart",
+  "floorSources": [
+    {
+      "kind": "appsettings",
+      "path": "/opt/kgsm-dns/kgsm-dns.settings.json"
+    },
+    {
+      "kind": "systemd-unit",
+      "path": "kgsm-dns.service"
+    },
+    {
+      "kind": "env-file",
+      "path": "/etc/kgsm-dns/kgsm-dns.env"
+    }
+  ],
+  "groups": [
+    {
+      "id": "network",
+      "label": "Network",
+      "order": 1
+    },
+    {
+      "id": "naming",
+      "label": "Naming",
+      "order": 2
+    },
+    {
+      "id": "provider",
+      "label": "Provider",
+      "order": 3
+    },
+    {
+      "id": "storage",
+      "label": "Storage",
+      "order": 4
+    },
+    {
+      "id": "general",
+      "label": "General",
+      "order": 5
+    }
+  ],
+  "fields": [
+    {
+      "key": "listenAddress",
+      "env": "Dns__ListenAddress",
+      "label": "Listen address",
+      "description": "The address this anchor listens on. It sits behind the machine's web server, which holds the certificate and answers the public name.",
+      "group": "network",
+      "type": "string",
+      "default": "http://127.0.0.1:8099",
+      "risk": "wiring"
+    },
+    {
+      "key": "memberId",
+      "env": "Dns__MemberId",
+      "label": "Cluster member id",
+      "description": "The name other members of the cluster know this anchor by. A machine can run more than one member — a node and an anchor are two members with two names — so this is not the machine's name. Blank derives one from it.",
+      "group": "network",
+      "type": "string",
+      "risk": "wiring"
+    },
+    {
+      "key": "publicBaseUrl",
+      "env": "Dns__PublicBaseUrl",
+      "label": "Public address",
+      "description": "The address other members of the cluster reach this anchor at. Set it when this machine sits behind a reverse proxy and cannot see its own public address; otherwise leave it blank and the addresses are learned when a member joins.",
+      "group": "network",
+      "type": "string",
+      "default": "",
+      "risk": "wiring"
+    },
+    {
+      "key": "publicAddress",
+      "env": "Dns__PublicAddress",
+      "label": "This machine's public address",
+      "description": "The public address of the machine this anchor runs on. Every other member is told its address by this anchor, which sees where their calls come from; this anchor cannot see its own, so it is the one address that is stated. Blank leaves this anchor's own name unpublished.",
+      "group": "network",
+      "type": "string",
+      "default": "",
+      "risk": "wiring"
+    },
+    {
+      "key": "zone",
+      "env": "Dns__Zone",
+      "label": "Zone",
+      "description": "The domain this cluster publishes names in, such as example.com. One domain is all a cluster needs: members, capabilities and game servers are named underneath it.",
+      "group": "naming",
+      "type": "string",
+      "default": "",
+      "risk": "destructive"
+    },
+    {
+      "key": "nodesBase",
+      "env": "Dns__NodesBase",
+      "label": "Members are named under",
+      "description": "The part of the domain members are named under. With nodes, a member is reached at something like jessie.nodes.example.com.",
+      "group": "naming",
+      "type": "string",
+      "default": "nodes",
+      "risk": "destructive"
+    },
+    {
+      "key": "anchorsBase",
+      "env": "Dns__AnchorsBase",
+      "label": "Capabilities are named under",
+      "description": "The part of the domain capabilities are named under. With anchors, the cluster's sign-in is reached at something like auth.anchors.example.com.",
+      "group": "naming",
+      "type": "string",
+      "default": "anchors",
+      "risk": "destructive"
+    },
+    {
+      "key": "playBase",
+      "env": "Dns__PlayBase",
+      "label": "Game servers are named under",
+      "description": "The part of the domain game servers are named under. With play, a server is played at something like minecraft.play.example.com.",
+      "group": "naming",
+      "type": "string",
+      "default": "play",
+      "risk": "destructive"
+    },
+    {
+      "key": "memberNames",
+      "env": "Dns__MemberNames",
+      "label": "Member names",
+      "description": "The names members are given when they join, one of which is drawn at random for each. Nothing on a machine has to be configured with what that machine is called.",
+      "group": "naming",
+      "type": "csv",
+      "default": "",
+      "risk": "safe"
+    },
+    {
+      "key": "memberNamePins",
+      "env": "Dns__MemberNamePins",
+      "label": "Pinned member names",
+      "description": "Members that keep a name they already answer to, written as member=name. A machine people already reach at a name goes on being reached there when it joins.",
+      "group": "naming",
+      "type": "csv",
+      "default": "",
+      "risk": "wiring"
+    },
+    {
+      "key": "provider",
+      "env": "Dns__Provider",
+      "label": "Provider",
+      "description": "The DNS provider this cluster's zone is hosted with.",
+      "group": "provider",
+      "type": "enum",
+      "values": [
+        "cloudflare"
+      ],
+      "default": "cloudflare",
+      "risk": "wiring"
+    },
+    {
+      "key": "providerZoneId",
+      "env": "Dns__ProviderZoneId",
+      "label": "Zone id",
+      "description": "The provider's identifier for the zone. Its dashboard shows it beside the domain.",
+      "group": "provider",
+      "type": "string",
+      "default": "",
+      "risk": "wiring"
+    },
+    {
+      "key": "providerToken",
+      "env": "Dns__ProviderToken",
+      "label": "API token",
+      "description": "The API token this anchor changes the zone with. It is held by this member alone, which is why every other member asks this one for a name instead of carrying a credential of its own.",
+      "group": "provider",
+      "type": "secret",
+      "default": "",
+      "risk": "destructive"
+    },
+    {
+      "key": "ttlSeconds",
+      "env": "Dns__TtlSeconds",
+      "label": "Record lifetime",
+      "description": "How long other computers remember an answer before asking again. Short, because a member changing address or a capability moving to another member takes effect only once the old answer has expired everywhere.",
+      "group": "provider",
+      "type": "int",
+      "default": "60",
+      "min": 30,
+      "unit": "seconds",
+      "risk": "safe"
+    },
+    {
+      "key": "reconcileSeconds",
+      "env": "Dns__ReconcileSeconds",
+      "label": "Zone check interval",
+      "description": "How often this anchor checks that the zone still says what the cluster asked it to say. It is what heals a record edited by hand and a write that failed halfway.",
+      "group": "provider",
+      "type": "int",
+      "default": "300",
+      "min": 30,
+      "unit": "seconds",
+      "risk": "safe"
+    },
+    {
+      "key": "registryPath",
+      "env": "Dns__RegistryPath",
+      "label": "Name registry",
+      "description": "The file this anchor records every claimed name in. It can be rebuilt from the zone itself, because each record says which cluster name it is.",
+      "group": "storage",
+      "type": "path",
+      "default": "/var/lib/kgsm-dns/names.db",
+      "risk": "destructive"
+    },
+    {
+      "key": "clusterStorePath",
+      "env": "Dns__ClusterStorePath",
+      "label": "Cluster store",
+      "description": "The file this member keeps its cluster membership in — who else is in the cluster, and the messages owed to them.",
+      "group": "storage",
+      "type": "path",
+      "default": "/var/lib/kgsm-dns/cluster.db",
+      "risk": "destructive"
+    },
+    {
+      "key": "configDescriptorPath",
+      "env": "Dns__ConfigDescriptorPath",
+      "label": "Config descriptor",
+      "description": "The file describing what this anchor can be configured with, written by its own build and installed by its deploy. It is read to render this page; absent, there is no page.",
+      "group": "storage",
+      "type": "path",
+      "default": "/var/lib/kgsm/anchors/dns-anchor.json",
+      "risk": "wiring"
+    },
+    {
+      "key": "logLevel",
+      "env": "Logging__LogLevel__Default",
+      "label": "Log level",
+      "description": "Minimum severity this anchor logs.",
+      "group": "general",
+      "type": "enum",
+      "values": [
+        "Trace",
+        "Debug",
+        "Information",
+        "Warning",
+        "Error",
+        "Critical"
+      ],
+      "default": "Information",
+      "risk": "safe"
+    }
+  ]
+}

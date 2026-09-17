@@ -1,0 +1,81 @@
+# Maintainer: Cristian Moraru <info@thekrystalship.com>
+#
+# Build from this directory:  cd packaging && makepkg
+#
+# Compiles nothing. CI publishes the Native-AOT binary first and this places the result, so the
+# packaged bytes are the tested bytes. Point KGSM_STAGE at that publish output, or leave it unset to
+# use ../artifacts/publish, which is where deploy.sh leaves one.
+#
+# The repo also publishes one NuGet package — the names themselves, which every member compiles
+# against — on its own version. The daemon is the one deployable, and it is what this ships.
+
+pkgname=kgsm-dns
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="KGSM DNS anchor — the names a cluster is reached at, and the one holder of its zone credential"
+arch=('x86_64')
+url="https://github.com/TheKrystalShip/kgsm-dns"
+license=('GPL-3.0-or-later')
+# On the selection menu, so a machine chosen to publish the cluster's names installs it the same way
+# it installs everything else. It is preset-DISABLED: a cluster has one DNS anchor, and which machine
+# holds it is a decision rather than a default.
+groups=('kgsm-node')
+# kgsm-base carries the kgsm service account this unit runs as, the /var/lib/kgsm/anchors directory
+# the descriptor lives in, the /var/lib/kgsm/cluster directory members on a machine share, and the
+# preset policy deciding whether this runs here.
+depends=('kgsm-base' 'systemd')
+backup=('etc/kgsm-dns/kgsm-dns.env')
+install="kgsm-dns.install"
+optdepends=(
+    'kgsm-api: the Control Panel, which renders this anchor configuration page'
+    'nginx: the public ingress in front of this anchor'
+)
+# No separate debug package: these are shipped to a private fleet, not a distro archive.
+options=('!debug')
+
+_stage() { printf '%s' "${KGSM_STAGE:-${startdir}/../artifacts/publish}"; }
+
+pkgver() {
+    "${startdir}/../deploy/version.sh" --pkgver
+}
+
+build() {
+    local stage; stage="$(_stage)"
+    [[ -f "${stage}/kgsm-dns" ]] || {
+        printf '\n  no publish output at %s\n' "$stage" >&2
+        printf '  build it first:  dotnet publish src/Dns.Anchor/Anchor.csproj -c Release -r linux-x64 -o artifacts/publish\n' >&2
+        printf '  or point KGSM_STAGE at an existing one.\n\n' >&2
+        return 1
+    }
+}
+
+package() {
+    local repo="${startdir}/.." stage; stage="$(_stage)"
+    local prefix="${pkgdir}/opt/${pkgname}"
+
+    # The AOT binary, the SQLite native lib it dlopens and the settings file, exactly as published.
+    install -dm755 "$prefix"
+    cp -a "${stage}/." "${prefix}/"
+    # A published tree carries build leftovers a package should not.
+    rm -f "${prefix}"/*.pdb "${prefix}"/*.dbg "${prefix}"/*.xml
+
+    install -Dm644 "${repo}/deploy/kgsm-dns.service" \
+        "${pkgdir}/usr/lib/systemd/system/kgsm-dns.service"
+
+    # Operator overrides. Seeded from the committed example — every knob commented — and listed in
+    # backup=(), so an upgrade writes .pacnew beside an edited file rather than over it. Root-owned
+    # 0640 is correct rather than strict: systemd reads EnvironmentFile= as root before dropping to
+    # User=, so nothing reads this as the service account. It is also where the zone credential
+    # lives, which is the reason the mode matters.
+    install -Dm640 "${repo}/deploy/kgsm-dns.env.example" \
+        "${pkgdir}/etc/${pkgname}/${pkgname}.env"
+
+    # The config descriptor, in the ANCHORS directory — not where a node's leaves are scanned for.
+    # This daemon serves one capability to the whole cluster and is a peer of every node in it, so it
+    # belongs on no node's service board. Packaged rather than installed by a script, so it can never
+    # describe a different build than the one beside it.
+    install -Dm644 "${repo}/deploy/kgsm-dns.anchor.json" \
+        "${pkgdir}/var/lib/kgsm/anchors/dns-anchor.json"
+
+    install -Dm644 "${repo}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

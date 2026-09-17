@@ -1,0 +1,72 @@
+[Unit]
+Description=KGSM DNS Anchor
+Documentation=https://github.com/TheKrystalShip
+After=network.target
+
+[Service]
+Type=simple
+# Runs as the KGSM user, not root. It writes its own state directory, talks to one HTTP API, and
+# binds an unprivileged port.
+User=kgsm
+Group=kgsm
+
+# Native-AOT single-file binary (publish: dotnet publish src/Dns.Anchor -c Release -r linux-x64).
+ExecStart=/opt/kgsm-dns/kgsm-dns
+
+# Loopback only. Other members reach this anchor through the machine's web server, which terminates
+# TLS and answers the public name.
+Environment=Dns__ListenAddress=http://127.0.0.1:8099
+
+# The address other members reach this anchor at. It cannot be worked out from the inside — behind a
+# proxy the daemon sees only the loopback hop — so it is stated, and it is what the roster carries.
+# Environment=Dns__PublicBaseUrl=https://dns.anchors.example
+
+# The zone, and the labels each kind of name lives under. Every name this anchor writes sits under one
+# of the three, so everything else in the zone is out of its reach.
+# Environment=Dns__Zone=example.com
+Environment=Dns__NodesBase=nodes
+Environment=Dns__AnchorsBase=anchors
+Environment=Dns__PlayBase=play
+
+# The registry and this member's cluster store, both in the state directory below, which systemd
+# creates owned by this user.
+Environment=Dns__RegistryPath=/var/lib/kgsm-dns/names.db
+Environment=Dns__ClusterStorePath=/var/lib/kgsm-dns/cluster.db
+
+# The shared cluster secret, loaded before this anchor's own env file so one file serves every member
+# on the machine. Blank means this host is not part of a cluster, which is a state and not a
+# misconfiguration.
+EnvironmentFile=-/etc/kgsm/kgsm-cluster.env
+
+# This anchor's own overrides, including the zone and the provider credential, which no default can
+# supply. Loaded last, so it wins over everything above.
+EnvironmentFile=-/etc/kgsm-dns/kgsm-dns.env
+
+# The state directory, created and owned by systemd for the user above. It holds the registry, which
+# records every name the cluster has claimed.
+StateDirectory=kgsm-dns
+StateDirectoryMode=0750
+
+Restart=always
+RestartSec=5
+
+# The daemon writes its own state directory and reads its configuration. Everything else on the
+# filesystem is off limits, and nothing it does needs privilege.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+
+# Where the config descriptor is installed, so kgsm-api can render this anchor's page. Written by
+# deploy.sh unprivileged, which needs the directory writable by the deploying user.
+ReadWritePaths=/var/lib/kgsm/anchors
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,40 @@
+# The preset policy in kgsm-base decides whether this daemon runs on a node; applying it is symlink
+# manipulation on disk, so it works during the transaction and in a chroot alike. Starting it is the
+# node's post-transaction hook's job, which is where a running system is available.
+#
+# post_install only. An administrator who enabled this unit keeps it enabled across every later
+# version — re-presetting on upgrade would quietly switch it back off.
+
+post_install() {
+    systemctl preset kgsm-dns.service > /dev/null 2>&1 || true
+
+    cat <<'MSG'
+
+  kgsm-dns is installed and switched OFF. A cluster publishes its names from one place, so which
+  machine holds that capability is a decision rather than a default — installing the package claims
+  nothing.
+
+  To make this machine the DNS anchor:
+
+      systemctl enable --now kgsm-dns.service
+
+  Three things it needs from you, in /etc/kgsm-dns/kgsm-dns.env: the zone, the provider's id for
+  that zone, and an API token for it. The token is held here and nowhere else, which is what lets
+  every other member ask this one for a name instead of carrying a credential of its own.
+
+  A machine joining a cluster also needs the shared secret in /etc/kgsm/kgsm-cluster.env.
+
+  Until a zone and a token are set, this anchor holds the capability, says it is unconfigured, and
+  publishes nothing.
+
+MSG
+}
+
+post_upgrade() {
+    cat <<'MSG'
+
+  If pacman wrote a .pacnew beside /etc/kgsm-dns/kgsm-dns.env, merge it — new settings are declared
+  there and a key the file never declares binds to nothing.
+
+MSG
+}

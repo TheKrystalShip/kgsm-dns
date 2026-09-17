@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Every member of a cluster compiles against this, and the anchor that holds the capability is
+         Native AOT, so the package carries no reflection and declares itself AOT-safe. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+
+    <RootNamespace>TheKrystalShip.KGSM.Dns</RootNamespace>
+    <AssemblyName>TheKrystalShip.KGSM.Dns</AssemblyName>
+    <Version>0.1.0</Version>
+
+    <PackageId>TheKrystalShip.KGSM.Dns</PackageId>
+    <Authors>TheKrystalShip</Authors>
+    <Description>
+      The names a KGSM cluster publishes: how a label is formed, which base it belongs under, and the
+      mark that says a record belongs to the cluster rather than to whoever else edits the zone.
+    </Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TheKrystalShip.KGSM.Dns.Tests" />
+  </ItemGroup>
+
+</Project>

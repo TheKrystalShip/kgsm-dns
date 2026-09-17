@@ -1,0 +1,75 @@
+{
+  // === KGSM DNS anchor — configuration ===
+  //
+  // This file declares the daemon's WHOLE configurable surface, each key with its default. It is the
+  // floor; an environment variable overrides one key of it by spelling that key's path with "__" —
+  // Dns__Zone, Logging__LogLevel__Default. A variable naming a key that is not declared here binds to
+  // nothing, which is what stops a stale override from looking applied.
+  //
+  // Every key below maps 1:1 onto a property of AnchorSettings, which the daemon binds in one step,
+  // and onto a [ConfigField] the config descriptor is generated from. A knob that exists in one place
+  // and not the others fails the build.
+
+  "Dns": {
+    // Where this anchor listens. Loopback, because the machine's web server holds the certificate and
+    // answers the public name; nothing reaches this port from outside the machine.
+    "ListenAddress": "http://127.0.0.1:8099",
+
+    // The name other members know this anchor by. A machine can run more than one member — a node and
+    // an anchor are two members with two names — so this is deliberately not the machine's name.
+    // Blank derives one from it.
+    "MemberId": "",
+
+    // The address other members reach this anchor at, when it sits behind a reverse proxy and cannot
+    // see its own. Blank leaves it to what a join reflects back.
+    "PublicBaseUrl": "",
+
+    // This machine's own public address. Every other member is told its address by this anchor, which
+    // sees where their calls arrive from; this anchor cannot see its own, so it is the one address in
+    // a cluster that is stated rather than observed. Blank leaves this anchor's own name unpublished,
+    // which is honest: a name pointing at a guess is worse than a name that does not resolve.
+    "PublicAddress": "",
+
+    // The zone every name lives in, and the three labels they live under. A cluster needs one domain:
+    // members, capabilities and game servers are named beneath it, and the separate bases are what
+    // make "is this record the cluster's?" a test rather than a judgement.
+    "Zone": "",
+    "NodesBase": "nodes",
+    "AnchorsBase": "anchors",
+    "PlayBase": "play",
+
+    // The names members are given when they join, one drawn at random for each, and the members that
+    // keep a name they already answer to, written as member=name.
+    "MemberNames": "",
+    "MemberNamePins": "",
+
+    // The zone's provider, its id for the zone, and the credential. The token is the reason one member
+    // holds this capability and every other member asks it for a name: a provider token scopes to a
+    // zone and not to a part of one, so a copy on every machine would be a copy of the whole zone.
+    // Declared blank here — the value lives in the root-owned env file.
+    "Provider": "cloudflare",
+    "ProviderZoneId": "",
+    "ProviderToken": "",
+
+    // How long other computers may remember an answer, and how often the zone is compared with what
+    // this anchor recorded. Short on the first, because a member changing address and a capability
+    // moving both take effect only once the old answer has expired everywhere.
+    "TtlSeconds": 60,
+    "ReconcileSeconds": 300,
+
+    // Where names are recorded, and where this member keeps its roster, outbox and inbox. The registry
+    // is rebuildable from the zone itself, because every record says which cluster name it is.
+    "RegistryPath": "/var/lib/kgsm-dns/names.db",
+    "ClusterStorePath": "/var/lib/kgsm-dns/cluster.db",
+
+    // The descriptor this build wrote, as the deploy installs it. Read to render this anchor's own
+    // configuration page; absent, there is no page.
+    "ConfigDescriptorPath": "/var/lib/kgsm/anchors/dns-anchor.json"
+  },
+
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Native AOT, like every other anchor and leaf. Nothing this daemon uses blocks it: the host is
+         the slim builder with minimal APIs, storage is raw ADO SQLite rather than an ORM, and every
+         wire shape is serialized through a source-generated context. -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <RootNamespace>TheKrystalShip.KGSM.Dns.Anchor</RootNamespace>
+    <AssemblyName>kgsm-dns</AssemblyName>
+    <Version>0.1.0</Version>
+
+    <!-- The config descriptor is generated from AnchorSettings by TheKrystalShip.KGSM.ComponentConfig.
+         These name the two files it works between; the attribute source, the documentation file the
+         <panel> tags travel in and the build step all come with the package. -->
+    <ComponentSettingsFile>kgsm-dns.settings.json</ComponentSettingsFile>
+    <ComponentDescriptorFile>$(MSBuildProjectDirectory)/../../deploy/kgsm-dns.anchor.json</ComponentDescriptorFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The settings file, named for this daemon rather than appsettings.json so it cannot collide with
+         a sibling's config if they ever share a directory. The Web SDK only auto-copies the literal
+         "appsettings.json", so the renamed file needs an explicit item to reach bin/ and publish/.
+         Program.cs loads it from AppContext.BaseDirectory, where deploy installs it. -->
+    <Content Update="kgsm-dns.settings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The names themselves: labels, bases and the mark a published record carries. Referenced by
+         project because it is this repo's own; every member outside it pins a published version. -->
+    <ProjectReference Include="../Dns/Dns.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Cluster membership and durable member-to-member messaging. This anchor is a member like any
+         other: it joins directly, answers the same wire, and needs no kgsm-api to do it. -->
+    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.18" />
+
+    <!-- The registry, on the daemon's own file. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build-only: the descriptor attributes arrive as source and the generator as a tool, and the
+         package declares no dependencies of its own, so none of it reaches the AOT publish. -->
+    <PackageReference Include="TheKrystalShip.KGSM.ComponentConfig" Version="3.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Scoped, same advisory and reasoning as every other member's: a native SQLite library pulled in
+         transitively, where the flagged version is the latest published build and there is nothing to
+         move to. A suppression does not travel with a reference, so the consuming project declares its
+         own. Delete it the moment a patched SQLitePCLRaw bundle ships. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TheKrystalShip.KGSM.Dns.Anchor.Tests" />
+  </ItemGroup>
+
+</Project>
