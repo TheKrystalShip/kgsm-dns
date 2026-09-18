@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
 using TheKrystalShip.KGSM.Dns.Serving;
 
@@ -60,6 +61,11 @@ public static class DnsMemberServiceCollectionExtensions
         services.AddSingleton<ICertificateRequester, BusCertificateRequester>();
         services.AddSingleton<CertificateKeeper>();
         services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>());
+
+        // The names this member serves are the addresses the cluster advertises for it, ahead of any it
+        // was reflected at.
+        services.AddSingleton<DnsSelfAddresses>();
+        services.AddSingleton<ISelfAddressSource>(sp => sp.GetRequiredService<DnsSelfAddresses>());
 
         services.AddSingleton<IClusterMessageHandler, DnsNamesHandler>();
         services.AddSingleton<IClusterMessageHandler, DnsCertHandler>();

@@ -49,11 +49,33 @@ public sealed record NginxSiteOptions(string Component, string SitesDirectory, s
 /// </remarks>
 public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, ILogger<NginxSite> logger)
 {
+    private volatile IReadOnlyList<string>? _served;
+
     /// <summary>Whether the host is provisioned to serve generated sites at all.</summary>
     public bool Usable => options.Usable;
 
     /// <summary>Whether this component has a generated site on disk, serving names or not.</summary>
     public bool Serving => File.Exists(options.SitePath);
+
+    /// <summary>
+    /// The names this component serves: every name the last pass proved answers with its certificate, or,
+    /// before any pass has run, every name in the site already on disk that has a current certificate —
+    /// the web server has been serving that file since before this process started.
+    /// </summary>
+    public IReadOnlyList<string> Served => _served ??= OnDisk();
+
+    private IReadOnlyList<string> OnDisk()
+    {
+        if (!File.Exists(options.SitePath))
+            return [];
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        return [.. File.ReadLines(options.SitePath)
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("server_name ", StringComparison.Ordinal))
+            .Select(line => line["server_name ".Length..].TrimEnd(';').Trim())
+            .Where(name => files.Held(name) is { Present: true } held && held.NotAfter > now)];
+    }
 
     /// <summary>
     /// Serve exactly these names, each with the certificate held for it.
@@ -80,20 +102,24 @@ public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, 
                 return false;
         }
 
-        bool all = true;
+        var proven = new List<string>(served.Count);
         foreach (HeldCertificate certificate in served)
         {
             string? live = await ServedFingerprintAsync(certificate.Name, ct).ConfigureAwait(false);
-            if (!string.Equals(live, certificate.Fingerprint, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(live, certificate.Fingerprint, StringComparison.OrdinalIgnoreCase))
+            {
+                proven.Add(certificate.Name);
+            }
+            else
             {
                 logger.LogWarning(
                     "{Name} is not served with the certificate on disk — the web server answers with {Live}",
                     certificate.Name, live ?? "nothing");
-                all = false;
             }
         }
 
-        return all;
+        _served = proven;
+        return proven.Count == served.Count;
     }
 
     internal string Render(IReadOnlyList<HeldCertificate> served)

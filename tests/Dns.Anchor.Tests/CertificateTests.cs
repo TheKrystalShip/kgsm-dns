@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using TheKrystalShip.KGSM.Dns.Anchor.Acme;
 using TheKrystalShip.KGSM.Dns.Anchor.Issuance;
+using TheKrystalShip.KGSM.Dns.Member;
+using TheKrystalShip.KGSM.Dns.Messages;
 using TheKrystalShip.KGSM.Dns.Serving;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Tests;
@@ -209,5 +211,38 @@ public sealed class CertificateFilesTests : IDisposable
         Assert.Contains("ssl_certificate     " + files.ChainPath("walter.nodes.example.com") + ";", rendered, StringComparison.Ordinal);
         Assert.Contains("include /etc/nginx/kgsm/kgsm-api.locations;", rendered, StringComparison.Ordinal);
         Assert.DoesNotContain("proxy_pass", rendered, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_restarted_member_advertises_the_names_its_site_already_serves_node_name_first()
+    {
+        var files = new CertificateFiles(_root);
+        var site = new NginxSite(
+            new NginxSiteOptions("kgsm-api", _root, "/etc/nginx/kgsm/kgsm-api.locations"),
+            files, NullLogger<NginxSite>.Instance);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        const string capability = "probe.anchors.example.com";
+        const string node = "walter.nodes.example.com";
+        const string lapsed = "old.anchors.example.com";
+        Assert.True(files.Install(capability, Issue(files.SigningRequest(capability), capability, now.AddDays(-1), now.AddDays(89))));
+        Assert.True(files.Install(node, Issue(files.SigningRequest(node), node, now.AddDays(-1), now.AddDays(89))));
+        Assert.True(files.Install(lapsed, Issue(files.SigningRequest(lapsed), lapsed, now.AddDays(-90), now.AddDays(-1))));
+
+        // The web server has served this file since before the process started; nothing has run a pass
+        // yet, and the anchor has not answered.
+        File.WriteAllText(Path.Combine(_root, "kgsm-api.conf"),
+            site.Render([files.Held(capability), files.Held(node), files.Held(lapsed)]));
+
+        var book = new DnsNameBook();
+        book.Replace([
+            new DnsNameEntry(node, NameKinds.Spell(NameKind.Member), "", "published", ""),
+            new DnsNameEntry(capability, NameKinds.Spell(NameKind.Capability), "probe", "published", ""),
+        ]);
+
+        // An expired certificate answers no handshake anybody accepts, so its name is not an address.
+        Assert.Equal(
+            ["https://" + node, "https://" + capability],
+            new DnsSelfAddresses(book, site).Addresses);
     }
 }

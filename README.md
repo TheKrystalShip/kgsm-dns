@@ -36,7 +36,8 @@ already follows it. Pointing at that name means a cluster record never has to mo
 does. A member with a fixed address states the address instead, and gets an `A` or `AAAA`.
 
 A name only ever points at where its own holder is reached, so a member can never have a name pointing
-at somebody else's machine. Only nodes are named under `nodes.`: a machine running a node and several
+at somebody else's machine. The names a member serves are also the addresses the cluster advertises for
+it, so a member in a cluster with a DNS anchor is configured with no address of its own. Only nodes are named under `nodes.`: a machine running a node and several
 anchors carries one node name, and each anchor is reached by the capability it holds.
 
 Every member, node or anchor, tells the anchor where it is reached, and the anchor keeps a name for

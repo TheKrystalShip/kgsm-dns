@@ -5,6 +5,23 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0]
+
+### Added — a member is advertised at the names it serves
+
+A member is reached at the names the anchor gave it, so those are the addresses the cluster advertises
+for it: every name its generated site serves with a certificate, node name first, ahead of every
+address it was reflected at and behind only a configured public address. A member therefore needs no
+configured address once it is in a cluster with a DNS anchor.
+
+- **Served, not merely held.** A published name with no certificate installed yet answers no handshake
+  here and is not offered.
+- **A restart advertises what the site on disk already serves**, before the anchor has answered, since
+  the web server has been serving that file all along. An expired certificate's name is not offered.
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.7`**: `DnsSelfAddresses`, registered by `AddKgsmDnsMember` as the
+  cluster package's `ISelfAddressSource`, and `NginxSite.Served`. Requires `TheKrystalShip.KGSM.Cluster
+  1.0.0-dev.20`.
+
 ## [0.7.0]
 
 ### Added — game servers that want one port behind one router are flagged

@@ -12,7 +12,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns</RootNamespace>
     <AssemblyName>TheKrystalShip.KGSM.Dns</AssemblyName>
-    <Version>0.2.0-dev.6</Version>
+    <Version>0.2.0-dev.7</Version>
 
     <PackageId>TheKrystalShip.KGSM.Dns</PackageId>
     <Authors>TheKrystalShip</Authors>
@@ -28,7 +28,7 @@
   <ItemGroup>
     <!-- The bus, the roster and the capability assignment a node's half of the exchange rides on.
          Every consumer is already a cluster member, so this adds nothing a consumer does not carry. -->
-    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.18" />
+    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.20" />
   </ItemGroup>
 
   <ItemGroup>
