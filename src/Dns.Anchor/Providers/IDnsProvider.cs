@@ -66,4 +66,7 @@ public interface IDnsProvider
 
     /// <summary>Remove one record.</summary>
     Task DeleteAsync(string id, CancellationToken ct = default);
+
+    /// <summary>The zone's own nameservers, which answer for what the zone holds right now.</summary>
+    Task<IReadOnlyList<string>> NameServersAsync(CancellationToken ct = default);
 }

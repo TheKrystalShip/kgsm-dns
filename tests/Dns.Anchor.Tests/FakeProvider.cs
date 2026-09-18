@@ -64,6 +64,9 @@ internal sealed class FakeProvider : IDnsProvider
         return Task.FromResult(updated);
     }
 
+    public Task<IReadOnlyList<string>> NameServersAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(["ns1.example.net", "ns2.example.net"]);
+
     public Task DeleteAsync(string id, CancellationToken ct = default)
     {
         ProviderRecord? record = _records.FirstOrDefault(r => r.Id == id);

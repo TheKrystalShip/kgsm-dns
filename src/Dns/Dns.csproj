@@ -12,7 +12,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns</RootNamespace>
     <AssemblyName>TheKrystalShip.KGSM.Dns</AssemblyName>
-    <Version>0.2.0-dev.1</Version>
+    <Version>0.2.0-dev.2</Version>
 
     <PackageId>TheKrystalShip.KGSM.Dns</PackageId>
     <Authors>TheKrystalShip</Authors>
@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="TheKrystalShip.KGSM.Dns.Tests" />
+    <InternalsVisibleTo Include="TheKrystalShip.KGSM.Dns.Anchor.Tests" />
   </ItemGroup>
 
 </Project>

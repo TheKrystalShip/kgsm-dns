@@ -22,6 +22,9 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// <param name="ProviderToken">The provider credential.</param>
 /// <param name="Ttl">How long resolvers may cache a name.</param>
 /// <param name="Reconcile">How often the zone is compared with the registry.</param>
+/// <param name="AcmeDirectory">The ACME directory certificates are ordered from.</param>
+/// <param name="AcmeContact">The address the issuer writes to, or empty for none.</param>
+/// <param name="AcmeAccountKeyPath">Where this holder's account key is kept.</param>
 /// <param name="RegistryPath">Where claimed names are recorded.</param>
 /// <param name="ClusterStorePath">Where this member keeps its roster, outbox and inbox.</param>
 /// <param name="ConfigDescriptorPath">Where the descriptor this build wrote is installed.</param>
@@ -37,6 +40,9 @@ internal sealed record AnchorOptions(
     string ProviderToken,
     int Ttl,
     TimeSpan Reconcile,
+    string AcmeDirectory,
+    string AcmeContact,
+    string AcmeAccountKeyPath,
     string RegistryPath,
     string ClusterStorePath,
     string ConfigDescriptorPath)
@@ -79,6 +85,11 @@ internal sealed record AnchorOptions(
             Ttl: Math.Max(AnchorSettings.Floors.TtlSeconds, settings.TtlSeconds ?? 60),
             Reconcile: TimeSpan.FromSeconds(
                 Math.Max(AnchorSettings.Floors.ReconcileSeconds, settings.ReconcileSeconds ?? 300)),
+            AcmeDirectory: string.IsNullOrWhiteSpace(settings.AcmeDirectory)
+                ? "https://acme-v02.api.letsencrypt.org/directory"
+                : settings.AcmeDirectory.Trim(),
+            AcmeContact: settings.AcmeContact.Trim(),
+            AcmeAccountKeyPath: settings.AcmeAccountKeyPath.Trim(),
             RegistryPath: settings.RegistryPath.Trim(),
             ClusterStorePath: settings.ClusterStorePath.Trim(),
             ConfigDescriptorPath: settings.ConfigDescriptorPath.Trim());

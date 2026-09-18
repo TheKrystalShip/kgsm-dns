@@ -5,6 +5,31 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0]
+
+### Added — the anchor issues every certificate in the cluster
+
+A member keeps a key per name it holds and asks the anchor for a certificate against a signing
+request; the anchor has it issued over ACME, answering the DNS-01 challenge through the zone it already
+holds the credential for, and sends the chain back. The key never leaves the member. The anchor's own
+name is served the same way, with no bus between its request and the issuer.
+
+- **The ACME order flow is written against RFC 8555**, because the anchor is Native AOT: an account
+  registered per holder with a key it generates, one order at a time off the request path, ES256
+  signatures, and a retry on a stale nonce.
+- **A challenge is confirmed at the zone's own nameservers** before the issuer is told to look, asked
+  directly over UDP so no resolver's cached negative answer can stand in for what the zone holds.
+- **A request is checked before it is ordered**: the sender must hold the name, published, and the
+  request must name that one name and nothing else, signed by its own key.
+- **Serving** is a generated site per component in `/var/lib/kgsm/nginx/`, one server block per name
+  with a certificate, including the component's own proxy rules; the member reloads nginx through a
+  grant that allows nothing else and confirms the served certificate over a TLS handshake. Renewal
+  falls due in the last third of a certificate's lifetime and is asked for by the member.
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.2`** carries the member half: `AddKgsmDnsMember(publicHost,
+  component)`.
+- **The package ships the serving pieces**: the proxy rules, the include, the directories as
+  `tmpfiles.d` entries, and the reload grant for the service account.
+
 ## [0.3.0]
 
 ### Added — nodes are named by the anchor they tell where they are reached

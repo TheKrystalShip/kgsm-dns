@@ -17,7 +17,26 @@ public static class DnsMessageTypes
     /// stands. A complete set, for the same reason.
     /// </summary>
     public const string Names = "dns.names";
+
+    /// <summary>
+    /// A member to the DNS anchor: a signing request for one name the member holds. The key it was made
+    /// with never leaves the member.
+    /// </summary>
+    public const string Csr = "dns.csr";
+
+    /// <summary>The DNS anchor to a member: the certificate chain issued for one of its names.</summary>
+    public const string Cert = "dns.cert";
 }
+
+/// <summary>A signing request for one name.</summary>
+/// <param name="Name">The name the certificate is for, which the member must hold.</param>
+/// <param name="Csr">The PKCS#10 request, DER, base64-encoded.</param>
+public sealed record DnsCsr(string Name, string Csr);
+
+/// <summary>A certificate issued for one name.</summary>
+/// <param name="Name">The name it is for.</param>
+/// <param name="Chain">The PEM chain, leaf first.</param>
+public sealed record DnsCert(string Name, string Chain);
 
 /// <summary>What a node says about itself.</summary>
 /// <param name="PublicHost">
@@ -50,6 +69,8 @@ public sealed record DnsNames(IReadOnlyList<DnsNameEntry> Names);
 [JsonSerializable(typeof(DnsSelf))]
 [JsonSerializable(typeof(DnsNames))]
 [JsonSerializable(typeof(DnsNameEntry))]
+[JsonSerializable(typeof(DnsCsr))]
+[JsonSerializable(typeof(DnsCert))]
 public sealed partial class DnsJsonContext : JsonSerializerContext
 {
     /// <summary>Read a payload off an envelope, or <see langword="null"/> when it is not that shape.</summary>

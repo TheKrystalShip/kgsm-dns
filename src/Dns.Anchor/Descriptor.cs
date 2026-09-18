@@ -19,8 +19,9 @@ using TheKrystalShip.KGSM.ComponentConfig;
 [assembly: ConfigGroup("network", "Network", 1)]
 [assembly: ConfigGroup("naming", "Naming", 2)]
 [assembly: ConfigGroup("provider", "Provider", 3)]
-[assembly: ConfigGroup("storage", "Storage", 4)]
-[assembly: ConfigGroup("general", "General", 5)]
+[assembly: ConfigGroup("certificates", "Certificates", 4)]
+[assembly: ConfigGroup("storage", "Storage", 5)]
+[assembly: ConfigGroup("general", "General", 6)]
 
 // Where this daemon's own configuration comes from, lowest precedence first — the same order Program.cs
 // resolves them in. The settings file is the base the other two override one key of.

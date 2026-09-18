@@ -67,5 +67,9 @@ MemoryDenyWriteExecute=false
 # deploy.sh unprivileged, which needs the directory writable by the deploying user.
 ReadWritePaths=/var/lib/kgsm/anchors
 
+# This anchor's own keys and certificates, and the site it generates for the web server. Optional
+# (the leading "-"): a host with no web server has neither, and the anchor then serves nothing itself.
+ReadWritePaths=-/var/lib/kgsm/tls/kgsm-dns -/var/lib/kgsm/nginx
+
 [Install]
 WantedBy=multi-user.target

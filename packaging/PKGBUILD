@@ -10,7 +10,7 @@
 # against — on its own version. The daemon is the one deployable, and it is what this ships.
 
 pkgname=kgsm-dns
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="KGSM DNS anchor — the names a cluster is reached at, and the one holder of its zone credential"
 arch=('x86_64')
@@ -76,6 +76,18 @@ package() {
     # describe a different build than the one beside it.
     install -Dm644 "${repo}/deploy/kgsm-dns.anchor.json" \
         "${pkgdir}/var/lib/kgsm/anchors/dns-anchor.json"
+
+    # Serving this anchor's own names: the proxy rules every generated block includes, this component's
+    # one-line include of the site it generates, the directories it keeps them in, and the grant that
+    # lets the service account reload the web server and do nothing else to it.
+    install -Dm644 "${repo}/deploy/nginx/kgsm-dns.locations" "${pkgdir}/etc/nginx/kgsm/kgsm-dns.locations"
+    install -Dm644 "${repo}/deploy/nginx/kgsm-dns.sites.conf" "${pkgdir}/etc/nginx/conf.d/00-kgsm-dns-sites.conf"
+    install -Dm644 "${repo}/deploy/kgsm-dns.serving.tmpfiles" "${pkgdir}/usr/lib/tmpfiles.d/kgsm-dns-serving.conf"
+    sed -e "s|@PROJECT@|kgsm-dns|g" -e "s|@SVC_USER@|kgsm|g" \
+        "${repo}/deploy/polkit/47-kgsm-dns-nginx-reload.rules.in" \
+        > "${srcdir}/47-kgsm-dns-nginx-reload.rules"
+    install -Dm644 "${srcdir}/47-kgsm-dns-nginx-reload.rules" \
+        "${pkgdir}/usr/share/polkit-1/rules.d/47-kgsm-dns-nginx-reload.rules"
 
     install -Dm644 "${repo}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

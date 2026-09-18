@@ -37,14 +37,19 @@
       "order": 3
     },
     {
+      "id": "certificates",
+      "label": "Certificates",
+      "order": 4
+    },
+    {
       "id": "storage",
       "label": "Storage",
-      "order": 4
+      "order": 5
     },
     {
       "id": "general",
       "label": "General",
-      "order": 5
+      "order": 6
     }
   ],
   "fields": [
@@ -203,6 +208,36 @@
       "min": 30,
       "unit": "seconds",
       "risk": "safe"
+    },
+    {
+      "key": "acmeDirectory",
+      "env": "Dns__AcmeDirectory",
+      "label": "Certificate issuer",
+      "description": "The certificate issuer this anchor orders from. Let's Encrypt's production directory issues certificates browsers trust; its staging directory issues ones they do not, for trying the whole path without spending the issuer's limits.",
+      "group": "certificates",
+      "type": "string",
+      "default": "https://acme-v02.api.letsencrypt.org/directory",
+      "risk": "wiring"
+    },
+    {
+      "key": "acmeContact",
+      "env": "Dns__AcmeContact",
+      "label": "Issuer contact",
+      "description": "An email address the issuer may write to about this cluster's certificates. Blank registers the account with no contact.",
+      "group": "certificates",
+      "type": "string",
+      "default": "",
+      "risk": "safe"
+    },
+    {
+      "key": "acmeAccountKeyPath",
+      "env": "Dns__AcmeAccountKeyPath",
+      "label": "Issuer account key",
+      "description": "The key this anchor's account with the issuer is registered under. Generated on first use and never copied: a member that takes this capability over registers its own.",
+      "group": "certificates",
+      "type": "path",
+      "default": "/var/lib/kgsm-dns/acme-account.pem",
+      "risk": "destructive"
     },
     {
       "key": "registryPath",

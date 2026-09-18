@@ -144,6 +144,19 @@ public sealed class CloudflareProvider(
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<string>> NameServersAsync(CancellationToken ct = default)
+    {
+        RequireConfigured();
+
+        using HttpClient client = Client();
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ApiBase}/zones/{options.ZoneId}", ct).ConfigureAwait(false);
+        CloudflareZoneResponse body = await ReadAsync(
+            response, CloudflareJsonContext.Default.CloudflareZoneResponse, ct).ConfigureAwait(false);
+
+        return body.Result?.NameServers ?? [];
+    }
+
     private HttpClient Client()
     {
         HttpClient client = factory.CreateClient(HttpClientName);

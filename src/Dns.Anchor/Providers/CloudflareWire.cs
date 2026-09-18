@@ -58,10 +58,22 @@ internal sealed class CloudflareRecordResponse
     [JsonPropertyName("result")] public CloudflareRecord? Result { get; set; }
 }
 
+internal sealed class CloudflareZone
+{
+    [JsonPropertyName("name_servers")] public List<string>? NameServers { get; set; }
+}
+
+internal sealed class CloudflareZoneResponse
+{
+    [JsonPropertyName("success")] public bool Success { get; set; }
+    [JsonPropertyName("result")] public CloudflareZone? Result { get; set; }
+}
+
 /// <summary>
 /// The provider's wire shapes, serialized without reflection so the anchor publishes as Native AOT.
 /// </summary>
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(CloudflareZoneResponse))]
 [JsonSerializable(typeof(CloudflareListResponse))]
 [JsonSerializable(typeof(CloudflareRecordResponse))]
 [JsonSerializable(typeof(CloudflareRecordWrite))]

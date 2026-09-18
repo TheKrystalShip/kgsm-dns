@@ -17,6 +17,7 @@ namespace TheKrystalShip.KGSM.Dns.Member;
 public sealed class DnsNamesHandler(
     ClusterStateStore state,
     DnsNameBook book,
+    Serving.CertificateKeeper keeper,
     ILogger<DnsNamesHandler> logger) : IClusterMessageHandler
 {
     public string Type => DnsMessageTypes.Names;
@@ -41,6 +42,10 @@ public sealed class DnsNamesHandler(
 
         string? before = book.NodeName;
         book.Replace(names.Names);
+
+        // A name that became published needs a certificate, and one that went away needs to stop being
+        // served; either way the keeper's next pass is now rather than at its interval.
+        keeper.Wake();
 
         if (!string.Equals(before, book.NodeName, StringComparison.Ordinal) && book.NodeName is { } now)
             logger.LogInformation("this node is reached at {Name}", now);

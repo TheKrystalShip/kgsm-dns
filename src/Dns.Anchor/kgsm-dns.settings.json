@@ -57,6 +57,13 @@
     "TtlSeconds": 60,
     "ReconcileSeconds": 300,
 
+    // The certificate issuer, an address it may write to, and where this holder's account key lives.
+    // The key is generated on first use and never copied: a member taking this capability over
+    // registers an account of its own, so nothing secret moves on failover.
+    "AcmeDirectory": "https://acme-v02.api.letsencrypt.org/directory",
+    "AcmeContact": "",
+    "AcmeAccountKeyPath": "/var/lib/kgsm-dns/acme-account.pem",
+
     // Where names are recorded, and where this member keeps its roster, outbox and inbox. The registry
     // is rebuildable from the zone itself, because every record says which cluster name it is.
     "RegistryPath": "/var/lib/kgsm-dns/names.db",

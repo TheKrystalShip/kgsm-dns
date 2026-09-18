@@ -36,9 +36,9 @@ ENABLE_UNITS=("${PROJECT}.service")
 
 PREFIX="/opt/${PROJECT}"
 
-# Operator config. The unit's Environment= lines carry working defaults and this file only overrides
-# them, so it is seeded almost entirely commented out — the exception being the zone and the token,
-# which no default can supply. setup.sh writes it once and never again; the unit reads it with
+# Operator config. The settings file carries the cluster's own values and the unit's Environment= lines
+# the rest, so this file is seeded entirely commented out; what it is for is the provider token and
+# where this machine is reached, which no shipped file can carry. setup.sh writes it once and never again; the unit reads it with
 # EnvironmentFile=-, so deleting it is also a supported way to say "no overrides".
 ENV_DIR="/etc/${PROJECT}"
 ENV_FILE="${ENV_DIR}/${PROJECT}.env"
@@ -75,7 +75,59 @@ health_probe() {
 # package has a directory whose ownership is that package's answer and not this one's.
 CLUSTER_SHARED_DIR="${KGSM_CLUSTER_SHARED_DIR:-/var/lib/kgsm/cluster}"
 
+# Serving this anchor's own names. It keeps a key and a certificate per name in a directory of its own,
+# writes one generated site into the directory every KGSM component's sites live in, and reloads the
+# web server through a grant that allows exactly that. The generated site includes this component's
+# proxy rules, which are reviewable content installed from the repo and written by nothing at runtime.
+TLS_DIR="/var/lib/kgsm/tls/${PROJECT}"
+SITES_DIR="/var/lib/kgsm/nginx"
+LOCATIONS_SRC="${REPO_DIR}/deploy/nginx/${PROJECT}.locations"
+SITES_INCLUDE_SRC="${REPO_DIR}/deploy/nginx/${PROJECT}.sites.conf"
+NGINX_RELOAD_TEMPLATE="${REPO_DIR}/deploy/polkit/47-${PROJECT}-nginx-reload.rules.in"
+NGINX_RELOAD_DST="/etc/polkit-1/rules.d/47-${PROJECT}-nginx-reload.rules"
+
+setup_serving() {
+    if [[ ! -d /etc/nginx ]]; then
+        log "nginx is not installed on this host — names are published, and served by nothing here"
+        return 0
+    fi
+
+    # Keys live here, readable by this component alone; the web server reads them as root.
+    $SUDO install -d -m 0700 -o "$DEPLOY_USER" -g "$DEPLOY_GROUP" "$TLS_DIR"
+
+    # Shared by every component on the machine, each writing and including only its own file. Setgid so
+    # a file keeps the directory's group whichever component writes it.
+    if [[ ! -d "$SITES_DIR" ]]; then
+        log "creating ${SITES_DIR} — the sites KGSM components generate"
+        $SUDO install -d -m 2775 -o "$DEPLOY_USER" -g "$DEPLOY_GROUP" "$SITES_DIR"
+    fi
+
+    $SUDO install -D -m 0644 -o root -g root "$LOCATIONS_SRC" "/etc/nginx/kgsm/${PROJECT}.locations"
+    # This component's own include, one per component, so two components on one machine never claim
+    # the same file.
+    $SUDO install -m 0644 -o root -g root "$SITES_INCLUDE_SRC" "/etc/nginx/conf.d/00-${PROJECT}-sites.conf"
+
+    local rendered
+    rendered="$(mktemp)"
+    sed -e "s|@PROJECT@|${PROJECT}|g" -e "s|@SVC_USER@|${DEPLOY_USER}|g" "$NGINX_RELOAD_TEMPLATE" > "$rendered"
+    if ! $SUDO cmp -s "$rendered" "$NGINX_RELOAD_DST" 2>/dev/null; then
+        log "installing the web-server reload grant → ${NGINX_RELOAD_DST}"
+        $SUDO install -D -m 0644 "$rendered" "$NGINX_RELOAD_DST"
+    fi
+    rm -f "$rendered"
+
+    # Validated before reloading: an include that does not load must fail here, loudly, rather than at
+    # the next reload for an unrelated reason.
+    if $SUDO nginx -t > /dev/null 2>&1; then
+        $SUDO systemctl reload nginx
+    else
+        warn "nginx -t failed with the KGSM sites include in place — NOT reloading; run 'sudo nginx -t'"
+    fi
+}
+
 setup_project_extras() {
+    setup_serving
+
     if [[ -d "$CLUSTER_SHARED_DIR" ]]; then
         log "shared cluster directory ${CLUSTER_SHARED_DIR} already exists — leaving its ownership alone"
         return 0

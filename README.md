@@ -45,11 +45,23 @@ and the name alone is not evidence of who made it. The marks are also what the r
 from, so a member taking the capability over converges on what the previous holder published with
 nothing having moved between them.
 
+## Certificates
+
+Every name a member serves over HTTPS has a certificate the anchor issued. The member generates the key
+and sends only a signing request; the anchor orders the certificate over ACME, proves the name through
+a DNS-01 challenge it writes into the zone, and sends the chain back. A member therefore needs no
+certbot, no open port 80, and nothing reachable before its first certificate exists.
+
+The member serves each name from a generated site, `/var/lib/kgsm/nginx/<component>.conf`, holding
+only names and certificate paths and including the component's own reviewed proxy rules. It reloads
+nginx through a grant that allows nothing else and checks the result over a real TLS handshake.
+Certificates are renewed in the last third of their lifetime.
+
 ## Packages
 
 | package | contents | taken by |
 |---|---|---|
-| **`TheKrystalShip.KGSM.Dns`** | labels, the three bases, and the mark a published record carries. No dependencies, AOT-safe. | every cluster member |
+| **`TheKrystalShip.KGSM.Dns`** | labels, the three bases, the mark a published record carries, the bus messages, and a member's half: stating where it is reached, keeping its names, and keeping a certificate and a served site for each. AOT-safe. | every cluster member |
 
 The deployable is **`kgsm-dns`** (`src/Dns.Anchor`), shipped as a pacman package and a systemd unit.
 

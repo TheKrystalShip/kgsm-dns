@@ -17,9 +17,18 @@ namespace TheKrystalShip.KGSM.Dns.Member;
 /// to a name that answers nobody.
 /// </para>
 /// </remarks>
-public sealed class DnsNameBook
+public sealed class DnsNameBook : Serving.IServedNames
 {
     private volatile IReadOnlyList<DnsNameEntry> _names = [];
+
+    /// <summary>
+    /// The names this member serves over HTTPS: its node name and the capability names it holds, once
+    /// published. A game name is played at directly and is never one of them.
+    /// </summary>
+    public IReadOnlyList<string> Published =>
+        [.. _names.Where(n => n.Published
+                && (n.Kind == NameKinds.Spell(NameKind.Member) || n.Kind == NameKinds.Spell(NameKind.Capability)))
+            .Select(n => n.Name)];
 
     /// <summary>When the anchor last told this member anything, or null if it never has.</summary>
     public DateTimeOffset? ReceivedAt { get; private set; }

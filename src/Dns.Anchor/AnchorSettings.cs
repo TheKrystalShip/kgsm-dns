@@ -138,6 +138,26 @@ internal sealed class AnchorSettings
         Min = Floors.ReconcileSeconds, Unit = "seconds")]
     public int? ReconcileSeconds { get; set; }
 
+    /// <summary>The ACME directory certificates are issued from.</summary>
+    /// <panel>The certificate issuer this anchor orders from. Let's Encrypt's production directory issues
+    /// certificates browsers trust; its staging directory issues ones they do not, for trying the whole
+    /// path without spending the issuer's limits.</panel>
+    [ConfigField("acmeDirectory", "Certificate issuer", Group = "certificates", Risk = ConfigRisk.Wiring)]
+    public string AcmeDirectory { get; set; } = "https://acme-v02.api.letsencrypt.org/directory";
+
+    /// <summary>The address the issuer writes to about this anchor's account.</summary>
+    /// <panel>An email address the issuer may write to about this cluster's certificates. Blank registers
+    /// the account with no contact.</panel>
+    [ConfigField("acmeContact", "Issuer contact", Group = "certificates", Risk = ConfigRisk.Safe)]
+    public string AcmeContact { get; set; } = "";
+
+    /// <summary>Where this holder's ACME account key is kept.</summary>
+    /// <panel>The key this anchor's account with the issuer is registered under. Generated on first use
+    /// and never copied: a member that takes this capability over registers its own.</panel>
+    [ConfigField("acmeAccountKeyPath", "Issuer account key", Group = "certificates", Type = ConfigType.Path,
+        Risk = ConfigRisk.Destructive)]
+    public string AcmeAccountKeyPath { get; set; } = "/var/lib/kgsm-dns/acme-account.pem";
+
     /// <summary>Where the names this cluster has claimed are recorded.</summary>
     /// <panel>The file this anchor records every claimed name in. It can be rebuilt from the zone
     /// itself, because each record says which cluster name it is.</panel>

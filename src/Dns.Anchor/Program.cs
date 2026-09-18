@@ -5,7 +5,11 @@ using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
 using TheKrystalShip.KGSM.Dns.Anchor.Providers;
+using TheKrystalShip.KGSM.Dns.Anchor.Acme;
+using TheKrystalShip.KGSM.Dns.Anchor.Issuance;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
+using TheKrystalShip.KGSM.Dns.Member;
+using TheKrystalShip.KGSM.Dns.Serving;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -83,6 +87,34 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterMembershipW
 // A node saying where it is reached. Registered as a handler on the cluster's inbox, which has already
 // checked that the sender is the member whose token signed the call.
 builder.Services.AddSingleton<IClusterMessageHandler, SelfHandler>();
+
+// Certificates. One issuer account per holder, whose key this member generates and never sends
+// anywhere; challenges answered through the zone this member already holds the credential for; orders
+// worked one at a time off the request path, because each takes the issuer a minute or two.
+builder.Services.AddHttpClient(nameof(AcmeClient), c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton(sp => new AcmeClient(
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(AcmeClient)),
+    options.AcmeDirectory,
+    options.AcmeContact,
+    options.AcmeAccountKeyPath,
+    sp.GetRequiredService<ILogger<AcmeClient>>()));
+builder.Services.AddSingleton<IDns01Solver, ZoneDns01Solver>();
+builder.Services.AddSingleton<IssuanceQueue>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IssuanceQueue>());
+builder.Services.AddSingleton<IClusterMessageHandler, CsrHandler>();
+
+// This anchor's own names, served the same way every member serves its own: a key per name, a
+// certificate kept current, and a generated site the web server includes. Only the request path
+// differs — straight to the issuer, with no bus between.
+builder.Services.AddSingleton<IServedNames, OwnNames>();
+builder.Services.AddSingleton(new CertificateFiles(Path.Combine(DnsServing.TlsRoot, "kgsm-dns")));
+builder.Services.AddSingleton(sp => new NginxSite(
+    DnsServing.For("kgsm-dns"),
+    sp.GetRequiredService<CertificateFiles>(),
+    sp.GetRequiredService<ILogger<NginxSite>>()));
+builder.Services.AddSingleton<ICertificateRequester, OwnCertificateRequester>();
+builder.Services.AddSingleton<CertificateKeeper>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>());
 
 WebApplication app = builder.Build();
 
