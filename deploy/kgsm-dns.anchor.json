@@ -78,10 +78,10 @@
       "risk": "wiring"
     },
     {
-      "key": "publicAddress",
-      "env": "Dns__PublicAddress",
-      "label": "This machine's public address",
-      "description": "The public address of the machine this anchor runs on. Every other member is told its address by this anchor, which sees where their calls come from; this anchor cannot see its own, so it is the one address that is stated. Blank leaves this anchor's own name unpublished.",
+      "key": "publicHost",
+      "env": "Dns__PublicHost",
+      "label": "This machine's public host",
+      "description": "Where this machine is reached from the internet — normally the dynamic-DNS name its network already keeps pointed at a changing home address, such as example.ddns.net. The capability's name points here, so an address change needs nothing from this anchor. A fixed public address works too. Blank leaves the capability's name unpublished.",
       "group": "network",
       "type": "string",
       "default": "",

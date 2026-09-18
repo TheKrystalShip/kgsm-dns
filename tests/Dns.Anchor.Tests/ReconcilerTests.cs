@@ -210,10 +210,16 @@ public sealed class ReconcilerTests : IDisposable
         Assert.Null(_registry.Find(row.Name));
     }
 
-    [Fact]
-    public async Task A_member_with_no_observed_address_publishes_nothing()
+    [Theory]
+    [InlineData("")]
+    [InlineData("192.168.1.128")]
+    [InlineData("100.72.0.5")]
+    [InlineData("dns.anchors.example.com")]
+    public async Task A_host_that_cannot_be_reached_from_outside_publishes_nothing(string host)
     {
-        NameRow row = _names.ClaimMember("node-a", "");
+        // Unknown, private, behind carrier-grade NAT, or one of this cluster's own names: each would be
+        // a record that resolves for nobody, or for nothing but itself.
+        NameRow row = _names.ClaimMember("node-a", host);
 
         RecordReconciler.Pass pass = await _reconciler.RunAsync(CancellationToken.None);
 
@@ -224,30 +230,72 @@ public sealed class ReconcilerTests : IDisposable
     }
 
     [Fact]
-    public async Task A_capability_points_at_its_holders_member_name()
+    public async Task A_node_on_a_dynamic_address_is_an_alias_of_its_dynamic_dns_name()
     {
-        NameRow holder = _names.ClaimMember("node-a", "203.0.113.10");
-        NameRow capability = _names.ClaimCapability("auth", "node-a");
+        // A home connection's address moves whenever the provider likes, and the network's own
+        // dynamic-DNS client already follows it. Pointing at that name means the cluster's record never
+        // has to move when the address does.
+        NameRow row = _names.ClaimMember("node-a", "Home.DDNS.net.");
+        await _reconciler.RunAsync(CancellationToken.None);
+
+        ProviderRecord published = _provider.Find(row.Name)!;
+        Assert.Equal("CNAME", published.Type);
+        Assert.Equal("home.ddns.net", published.Content);
+    }
+
+    [Fact]
+    public async Task A_capability_points_at_its_holders_host()
+    {
+        NameRow capability = _names.ClaimCapability("auth", "anchor-a", "home.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
         Assert.Equal(Bases.Compose(NameKind.Capability, "auth"), capability.Name);
         ProviderRecord published = _provider.Find(capability.Name)!;
         Assert.Equal("CNAME", published.Type);
-        Assert.Equal(holder.Name, published.Content);
+        Assert.Equal("home.ddns.net", published.Content);
+    }
+
+    [Fact]
+    public void An_anchor_holds_no_node_name()
+    {
+        // A machine running a node and several anchors carries one node name, not one per member.
+        _names.ClaimCapability("dns", "anchor-a", "home.ddns.net");
+
+        Assert.Empty(_registry.OfKind(NameKind.Member));
     }
 
     [Fact]
     public async Task Reassigning_a_capability_moves_its_name_to_the_new_holder()
     {
-        _names.ClaimMember("node-a", "203.0.113.10");
-        _names.ClaimCapability("auth", "node-a");
+        _names.ClaimCapability("auth", "anchor-a", "home.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
-        NameRow second = _names.ClaimMember("node-b", "198.51.100.7");
-        NameRow moved = _names.ClaimCapability("auth", "node-b");
+        NameRow moved = _names.ClaimCapability("auth", "anchor-b", "friend.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
-        Assert.Equal(second.Name, _provider.Find(moved.Name)!.Content);
+        Assert.Equal("anchor-b", moved.Member);
+        Assert.Equal("friend.ddns.net", _provider.Find(moved.Name)!.Content);
+        Assert.Equal(new RecordMark(NameKind.Capability, "anchor-b", "auth"), _provider.Find(moved.Name)!.Mark);
+    }
+
+    [Fact]
+    public void A_name_pinned_to_another_member_is_never_drawn()
+    {
+        // The first node to join must not draw the name somebody else is already promised.
+        var names = new NameService(
+            _registry,
+            Bases,
+            new MemberNamePool(["walter", "skyler"], new Dictionary<string, string> { ["hotrod"] = "walter" }),
+            NullLogger<NameService>.Instance);
+
+        for (int i = 0; i < 20; i++)
+        {
+            NameRow drawn = names.ClaimMember("node-" + i, "203.0.113.10");
+            Assert.NotEqual(Bases.Compose(NameKind.Member, "walter"), drawn.Name);
+            names.Release(drawn.Name);
+        }
+
+        Assert.Equal(Bases.Compose(NameKind.Member, "walter"), names.ClaimMember("hotrod", "home.ddns.net").Name);
     }
 
     [Fact]

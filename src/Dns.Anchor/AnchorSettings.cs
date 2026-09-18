@@ -53,14 +53,14 @@ internal sealed class AnchorSettings
     public string PublicBaseUrl { get; set; } = "";
 
     /// <summary>
-    /// This anchor's own public address, which is the one address in a cluster nobody else can observe.
+    /// Where this machine is reached from the public internet: normally its dynamic-DNS hostname.
     /// </summary>
-    /// <panel>The public address of the machine this anchor runs on. Every other member is told its
-    /// address by this anchor, which sees where their calls come from; this anchor cannot see its own,
-    /// so it is the one address that is stated. Blank leaves this anchor's own name unpublished.</panel>
-    [ConfigField("publicAddress", "This machine's public address", Group = "network",
-        Risk = ConfigRisk.Wiring)]
-    public string PublicAddress { get; set; } = "";
+    /// <panel>Where this machine is reached from the internet — normally the dynamic-DNS name its
+    /// network already keeps pointed at a changing home address, such as example.ddns.net. The
+    /// capability's name points here, so an address change needs nothing from this anchor. A fixed
+    /// public address works too. Blank leaves the capability's name unpublished.</panel>
+    [ConfigField("publicHost", "This machine's public host", Group = "network", Risk = ConfigRisk.Wiring)]
+    public string PublicHost { get; set; } = "";
 
     /// <summary>The DNS zone every name this cluster publishes lives in.</summary>
     /// <panel>The domain this cluster publishes names in, such as example.com. One domain is all a

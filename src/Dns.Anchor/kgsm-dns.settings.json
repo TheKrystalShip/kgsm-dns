@@ -24,11 +24,11 @@
     // see its own. Blank leaves it to what a join reflects back.
     "PublicBaseUrl": "",
 
-    // This machine's own public address. Every other member is told its address by this anchor, which
-    // sees where their calls arrive from; this anchor cannot see its own, so it is the one address in
-    // a cluster that is stated rather than observed. Blank leaves this anchor's own name unpublished,
-    // which is honest: a name pointing at a guess is worse than a name that does not resolve.
-    "PublicAddress": "",
+    // Where this machine is reached from the internet — normally the dynamic-DNS name its network
+    // already keeps pointed at a changing home address. The capability's name is a CNAME to it, so an
+    // address change moves nothing here. A fixed public address works too. Blank leaves the
+    // capability's name unpublished: a name pointing at a guess is worse than one that does not resolve.
+    "PublicHost": "",
 
     // The zone every name lives in, and the three labels they live under. A cluster needs one domain:
     // members, capabilities and game servers are named beneath it, and the separate bases are what

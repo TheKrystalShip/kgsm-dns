@@ -19,10 +19,12 @@ src/Dns.Anchor/   the daemon: registry, provider, reconciler, capability standin
 These are the reason the design is safe. Breaking one is not a regression in a feature — it is the
 component becoming something else.
 
-- **A target is derived, never accepted.** `NameService` works out where every record points from
-  what the cluster already knows: a member's observed address, the capability's assigned holder, the
-  owner's member name. Nothing a member sends decides where a name resolves, which is what bounds a
-  compromised member to pointing names at itself.
+- **A name points at where its own holder is reached, and nowhere else.** A node name at that node's
+  public host, a capability name at its assigned holder's host, a game name at its node's name. A host
+  is a hostname (a `CNAME`, normally a dynamic-DNS name) or a public address; `PublicHost` refuses
+  anything nobody outside could reach, and anything inside the cluster's own bases.
+- **Only nodes hold node names.** An anchor is reached by its capability, so a machine carries one node
+  name however many anchors run on it. A pinned name is reserved for its member before it joins.
 - **Nothing outside the three bases is written.** `ClusterBases.Owns` is the test, and it is a test
   on the name rather than a judgement about intent. The names people sign in through live at the top
   of the zone, outside every base.
@@ -38,7 +40,7 @@ component becoming something else.
   for a member the zone already names, and the next pass withdraws the one it is reached at.
 - **A name is sticky.** A member keeps it across restarts and address changes. Certificates, game
   names and people's bookmarks all name it.
-- **Nothing is published against a guess.** A member with no observed address, or a label whose whole
+- **Nothing is published against a guess.** A member with no usable public host, or a label whose whole
   numbered series is held, is a blocked row carrying the reason. A name pointing at a guess is worse
   than a name that does not resolve.
 - **Standing by means writing nothing.** Two members writing one zone would each reconcile the

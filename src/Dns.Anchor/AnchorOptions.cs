@@ -14,7 +14,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// <param name="MemberId">This anchor's identity as a cluster member.</param>
 /// <param name="ListenAddress">Where Kestrel binds.</param>
 /// <param name="PublicBaseUrl">Where other members reach it, when it cannot see its own address.</param>
-/// <param name="PublicAddress">This machine's public address, which nothing else can observe for it.</param>
+/// <param name="PublicHost">Where this machine is reached: its dynamic-DNS name, or a fixed address.</param>
 /// <param name="Bases">The zone and the three bases names live under.</param>
 /// <param name="MemberNames">The names members are drawn from, and the pins that override a draw.</param>
 /// <param name="Provider">Which provider implementation acts on the zone.</param>
@@ -29,7 +29,7 @@ internal sealed record AnchorOptions(
     string MemberId,
     string ListenAddress,
     string PublicBaseUrl,
-    string PublicAddress,
+    string PublicHost,
     ClusterBases Bases,
     Names.MemberNamePool MemberNames,
     string Provider,
@@ -70,7 +70,7 @@ internal sealed record AnchorOptions(
                 ? "http://127.0.0.1:8099"
                 : settings.ListenAddress.Trim(),
             PublicBaseUrl: settings.PublicBaseUrl.Trim().TrimEnd('/'),
-            PublicAddress: settings.PublicAddress.Trim(),
+            PublicHost: settings.PublicHost.Trim(),
             Bases: bases,
             MemberNames: new Names.MemberNamePool(Csv(settings.MemberNames), Pins(settings.MemberNamePins)),
             Provider: string.IsNullOrWhiteSpace(settings.Provider) ? "cloudflare" : settings.Provider.Trim(),

@@ -76,14 +76,19 @@ internal sealed class ClusterMembershipWorker(
             return;
         }
 
-        // This anchor's own name, and the name its capability is reached at. Claimed on every pass
-        // because both are derived: the address can move, and the capability can be reassigned to
-        // another member, so writing them once would leave whichever moved first behind.
-        NameRow self = names.ClaimMember(options.MemberId, options.PublicAddress);
-        names.ClaimCapability(DnsCapability.Name, options.MemberId);
+        // The name this capability is reached at. An anchor holds no node name — it is reached by what
+        // it serves — so this is the only name it claims for itself. Claimed on every pass because the
+        // host can be changed in configuration and the capability can be reassigned to another member,
+        // and writing it once would leave whichever moved first behind.
+        NameRow self = names.ClaimCapability(DnsCapability.Name, options.MemberId, options.PublicHost);
+
+        // And a node name under this member's id is released: this member is an anchor, and a node
+        // name on it would be a second name for a machine that already has one through its node.
+        foreach (NameRow held in names.Held(options.MemberId).Where(r => r.Kind == NameKind.Member))
+            names.Release(held.Name);
 
         if (self.State == NameState.Blocked && changed)
-            logger.LogWarning("this anchor's own name is not published: {Note}", self.Note);
+            logger.LogWarning("{Name} is not published: {Note}", self.Name, self.Note);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (now < _nextZonePass)

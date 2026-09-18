@@ -132,3 +132,40 @@ public sealed class RecordMarkTests
         Assert.Equal(mark, RecordMark.Parse(mark.ToString()));
     }
 }
+
+public sealed class PublicHostTests
+{
+    private static readonly ClusterBases Bases = new("example.com", "nodes", "anchors", "play");
+
+    [Theory]
+    [InlineData("hotbox.ddns.net", "CNAME", "hotbox.ddns.net")]
+    [InlineData("Hotbox.DDNS.net.", "CNAME", "hotbox.ddns.net")]
+    [InlineData("95.19.50.122", "A", "95.19.50.122")]
+    [InlineData("2001:4860:4860::8888", "AAAA", "2001:4860:4860::8888")]
+    public void A_public_host_becomes_the_record_that_reaches_it(string written, string type, string content)
+    {
+        Assert.True(PublicHost.TryRead(written, Bases, out PublicHost host, out _));
+        Assert.Equal(type, host.Type);
+        Assert.Equal(content, host.Content);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("10.0.0.4")]
+    [InlineData("172.20.1.1")]
+    [InlineData("192.168.1.128")]
+    [InlineData("100.64.0.1")]
+    [InlineData("127.0.0.1")]
+    [InlineData("169.254.1.1")]
+    [InlineData("fd00::1")]
+    [InlineData("fe80::1")]
+    [InlineData("localhost")]
+    [InlineData("under_score.example.org")]
+    [InlineData("walter.nodes.example.com")]
+    [InlineData("play.example.com")]
+    public void A_host_nobody_outside_could_reach_is_refused_with_a_reason(string written)
+    {
+        Assert.False(PublicHost.TryRead(written, Bases, out _, out string reason));
+        Assert.NotEmpty(reason);
+    }
+}

@@ -50,7 +50,14 @@ public sealed class MemberNamePool(IReadOnlyList<string> names, IReadOnlyDiction
                 return label;
         }
 
-        List<string> free = [.. Names.Where(n => !taken(n))];
+        // A label pinned to another member is reserved for it even before it joins, so a node that
+        // happens to join first cannot draw the name somebody else is already promised.
+        var reserved = new HashSet<string>(
+            Pins.Where(p => !string.Equals(p.Key, member, StringComparison.Ordinal))
+                .Select(p => DnsLabel.Sanitize(p.Value)),
+            StringComparer.Ordinal);
+
+        List<string> free = [.. Names.Where(n => !taken(n) && !reserved.Contains(n))];
         if (free.Count == 0)
         {
             // The list is exhausted. A member id reduced to a label is not drawn as a fallback: the

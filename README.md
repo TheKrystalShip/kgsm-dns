@@ -2,12 +2,13 @@
 
 The names a KGSM cluster is reached at, and the one member that publishes them.
 
-Every member, every capability and every game server has its own name under one domain, and a
-machine is configured with none of them: a member joins knowing only where to ask, and is given a
-name. One anchor holds the zone's credential and writes every record; every other member asks it.
+Every node, every capability and every game server has its own name under one domain, and a machine
+is configured with none of them: a member joins knowing only where to ask, states where it is reached,
+and is given a name. One anchor holds the zone's credential and writes every record; every other member
+asks it.
 
 ```
-<member>.nodes.example.com        a member — a browser and the other members reach it here
+<node>.nodes.example.com          a node — a browser and the other members reach it here
 <capability>.anchors.example.com  a capability — follows whichever member holds it
 <game>.play.example.com           a game server — players connect here, directly
 ```
@@ -26,12 +27,17 @@ pattern is one a player can guess.
 
 | kind | record | points at |
 |---|---|---|
-| member | `A` / `AAAA` | the public address observed for that member |
-| capability | `CNAME` | the member currently holding the capability |
-| game server | `CNAME` | the member's own name |
+| node | `CNAME` | the node's public host — normally its network's dynamic-DNS name |
+| capability | `CNAME` | the public host of the member currently holding the capability |
+| game server | `CNAME` | its node's name |
 
-Every target is derived by the anchor from what the cluster already knows, never taken from the
-request — so a member can only ever have names pointing at itself.
+A home connection's address moves whenever its provider likes, and the network's dynamic-DNS client
+already follows it. Pointing at that name means a cluster record never has to move when the address
+does. A member with a fixed address states the address instead, and gets an `A` or `AAAA`.
+
+A name only ever points at where its own holder is reached, so a member can never have a name pointing
+at somebody else's machine. Only nodes are named under `nodes.`: a machine running a node and several
+anchors carries one node name, and each anchor is reached by the capability it holds.
 
 Every record carries a mark saying which cluster name it is and who holds it. A record without one
 is never edited, deleted, or counted as satisfying a name: a zone holds records people made by hand,

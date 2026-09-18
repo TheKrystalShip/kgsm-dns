@@ -5,6 +5,24 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0]
+
+### Changed — names point at dynamic-DNS hosts, and only nodes hold node names
+
+A name is a `CNAME` to its holder's public host, which on a home connection is the dynamic-DNS name the
+network already keeps pointed at a changing address. The cluster's record then never moves when the
+address does. A fixed public address is still accepted and becomes an address record; a private,
+loopback, link-local or carrier-grade NAT address, or one of the cluster's own names, is refused with
+the reason.
+
+`Dns__PublicAddress` is `Dns__PublicHost`, and takes a hostname.
+
+An anchor holds no node name: it is reached by the capability it holds, and a node name found under an
+anchor's id is released. A machine running a node beside several anchors carries one node name.
+
+A name pinned to a member is reserved for it before it joins, so a node joining first cannot draw the
+name somebody else is promised.
+
 ## [0.1.1]
 
 ### Fixed — a holder that lost its store keeps its name
