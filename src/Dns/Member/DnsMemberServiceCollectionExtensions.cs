@@ -27,12 +27,13 @@ public static class DnsServing
         component, SitesDirectory, Path.Combine(LocationsDirectory, component + ".locations"));
 }
 
-/// <summary>Registers what a node needs to be named by the cluster's DNS anchor, and served under that name.</summary>
+/// <summary>Registers what a member needs to be named by the cluster's DNS anchor, and served under those names.</summary>
 public static class DnsMemberServiceCollectionExtensions
 {
     /// <summary>
-    /// Tell the DNS anchor where this node is reached, keep what it answers, and keep a certificate and
-    /// a served site for every name it gives this node.
+    /// Tell the DNS anchor where this member is reached, keep what it answers, and keep a certificate and
+    /// a served site for every name it gives this member: a node's own name, and the name of every
+    /// capability the member holds.
     /// </summary>
     /// <remarks>
     /// Inert on a member that is not in a cluster, and harmless in a cluster nobody holds <c>dns</c> in:
@@ -41,9 +42,9 @@ public static class DnsMemberServiceCollectionExtensions
     /// cluster package to be registered.
     /// </remarks>
     /// <param name="services">The member's service collection.</param>
-    /// <param name="publicHost">Where this node is reached from the internet — normally its network's
+    /// <param name="publicHost">Where this member is reached from the internet — normally its network's
     /// dynamic-DNS name.</param>
-    /// <param name="component">The component serving this node's names, such as <c>kgsm-api</c>.</param>
+    /// <param name="component">The component serving this member's names, such as <c>kgsm-api</c>.</param>
     public static IServiceCollection AddKgsmDnsMember(
         this IServiceCollection services, string publicHost, string component)
     {

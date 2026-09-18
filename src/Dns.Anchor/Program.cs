@@ -60,6 +60,7 @@ builder.Services.AddKgsmCluster(clusterOptions);
 
 builder.Services.AddSingleton(_ => new SqliteNameRegistry(options.RegistryPath));
 builder.Services.AddSingleton<NameService>();
+builder.Services.AddSingleton<CapabilityNames>();
 
 // The zone, through whichever provider holds it. A timeout on the client because a provider that hangs
 // must not hold a reconcile pass open: the pass is on a timer and the next one does the same work.

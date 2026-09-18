@@ -28,6 +28,31 @@ public sealed class MessageTests
     }
 
     [Fact]
+    public void Not_yet_told_and_told_nothing_are_different_answers()
+    {
+        // A member that has not heard from the anchor since it started keeps serving what it served; one
+        // the anchor told it holds nothing withdraws it.
+        var book = new DnsNameBook();
+        Assert.False(book.Answered);
+
+        book.Replace([]);
+
+        Assert.True(book.Answered);
+        Assert.Empty(book.Published);
+    }
+
+    [Fact]
+    public void A_capability_name_is_served_once_published_and_is_no_node_name()
+    {
+        var book = new DnsNameBook();
+
+        book.Replace([new DnsNameEntry("auth.anchors.example.com", "capability", "auth", "published", "")]);
+
+        Assert.Equal(["auth.anchors.example.com"], book.Published);
+        Assert.Null(book.NodeName);
+    }
+
+    [Fact]
     public void A_node_is_reached_at_its_name_only_once_the_provider_carries_it()
     {
         var book = new DnsNameBook();

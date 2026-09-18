@@ -17,6 +17,12 @@ public interface IServedNames
 {
     /// <summary>Every name the anchor reports published for this member.</summary>
     IReadOnlyList<string> Published { get; }
+
+    /// <summary>
+    /// Whether the anchor has said which names this member holds. Until it has, an empty set means not
+    /// yet told rather than none.
+    /// </summary>
+    bool Answered { get; }
 }
 
 /// <summary>
@@ -101,8 +107,12 @@ public sealed class CertificateKeeper(
 
     private async Task PassAsync(CancellationToken ct)
     {
+        // No names withdraws whatever this member serves, but only once the anchor has said so. Before its
+        // first answer — every restart, and a process that is in no cluster at all — empty is not yet told,
+        // and acting on it would take every name offline until the anchor next speaks. A member that holds
+        // nothing and serves nothing has nothing to do.
         IReadOnlyList<string> published = names.Published;
-        if (published.Count == 0)
+        if (published.Count == 0 && (!names.Answered || !site.Serving))
             return;
 
         // A host nobody provisioned to serve generated sites keeps its names and serves them however

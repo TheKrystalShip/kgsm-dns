@@ -39,6 +39,12 @@ A name only ever points at where its own holder is reached, so a member can neve
 at somebody else's machine. Only nodes are named under `nodes.`: a machine running a node and several
 anchors carries one node name, and each anchor is reached by the capability it holds.
 
+Every member, node or anchor, tells the anchor where it is reached, and the anchor keeps a name for
+every capability the cluster assigns, pointing at the host its holder stated. The names are derived
+again from the cluster's assignments every few seconds, so reassigning a capability moves its name, and
+the new holder is told it holds it and asks for its certificate. A capability held by nobody has no
+name.
+
 Every record carries a mark saying which cluster name it is and who holds it. A record without one
 is never edited, deleted, or counted as satisfying a name: a zone holds records people made by hand,
 and the name alone is not evidence of who made it. The marks are also what the registry is rebuilt

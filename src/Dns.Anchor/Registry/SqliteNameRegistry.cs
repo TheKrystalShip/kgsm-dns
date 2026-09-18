@@ -7,13 +7,15 @@ using TheKrystalShip.KGSM.Dns;
 namespace TheKrystalShip.KGSM.Dns.Anchor.Registry;
 
 /// <summary>
-/// Every name this cluster has claimed, on the holder's own SQLite file.
+/// Every name this cluster has claimed, and where each member said it is reached, on the holder's own
+/// SQLite file.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The registry is the authority for what the zone should say, and the provider is reconciled to it.
-/// It is also recoverable: every row is derivable from the marks on the records themselves, so a
-/// member that takes the capability rebuilds it rather than inheriting a file.
+/// It is also recoverable: every name is derivable from the marks on the records themselves, so a
+/// member that takes the capability rebuilds it rather than inheriting a file. The stated hosts are not
+/// in the zone and are not recovered; every member restates its host when the capability moves.
 /// </para>
 /// <para>
 /// SQLite is single-writer, so writes serialise through a process lock while WAL keeps reads
@@ -65,6 +67,11 @@ public sealed class SqliteNameRegistry
             );
             CREATE INDEX IF NOT EXISTS idx_names_member ON names (member);
             CREATE INDEX IF NOT EXISTS idx_names_kind ON names (kind);
+            CREATE TABLE IF NOT EXISTS hosts (
+                member     TEXT PRIMARY KEY,
+                host       TEXT NOT NULL,
+                stated_at  TEXT NOT NULL
+            );
             """;
         cmd.ExecuteNonQuery();
     }
@@ -175,6 +182,58 @@ public sealed class SqliteNameRegistry
             cmd.Parameters.AddWithValue("$name", name);
             cmd.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Record where a member last said it is reached. Empty is a statement too: the member has no
+    /// public host.
+    /// </summary>
+    public void StateHost(string member, string host)
+    {
+        lock (_writeGate)
+        {
+            using SqliteConnection connection = Open();
+            using SqliteCommand cmd = connection.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO hosts (member, host, stated_at) VALUES ($member, $host, $stated_at)
+                ON CONFLICT(member) DO UPDATE SET host = excluded.host, stated_at = excluded.stated_at
+                """;
+            cmd.Parameters.AddWithValue("$member", member);
+            cmd.Parameters.AddWithValue("$host", host);
+            cmd.Parameters.AddWithValue(
+                "$stated_at", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Where a member last said it is reached, or <see langword="null"/> when it never has.
+    /// </summary>
+    /// <remarks>
+    /// Never said and said none are different answers. A member that has not spoken to this holder yet
+    /// — which is every member for a moment after the capability moves — is not a member with no host.
+    /// </remarks>
+    public string? HostOf(string member)
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT host FROM hosts WHERE member = $member";
+        cmd.Parameters.AddWithValue("$member", member);
+        return cmd.ExecuteScalar() as string;
+    }
+
+    /// <summary>Every member that has said where it is reached.</summary>
+    public IReadOnlyList<string> StatedMembers()
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT member FROM hosts ORDER BY member";
+        var members = new List<string>();
+        using SqliteDataReader reader = cmd.ExecuteReader();
+        while (reader.Read())
+            members.Add(reader.GetString(0));
+        return members;
     }
 
     /// <summary>Whether any row holds this name.</summary>

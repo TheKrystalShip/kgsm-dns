@@ -17,6 +17,9 @@ internal sealed class OwnNames(SqliteNameRegistry registry, AnchorOptions option
         [.. registry.ForMember(options.MemberId)
             .Where(r => r.Kind == NameKind.Capability && r.State == NameState.Published)
             .Select(r => r.Name)];
+
+    /// <summary>The registry is this anchor's own answer, so it is always one.</summary>
+    public bool Answered => true;
 }
 
 /// <summary>

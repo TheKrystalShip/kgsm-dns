@@ -87,14 +87,17 @@ public sealed class NameService(
     /// </remarks>
     /// <param name="capability">The capability, as the cluster's assignment names it.</param>
     /// <param name="holder">The member the cluster assigns it to.</param>
-    /// <param name="holderHost">Where that member is reached.</param>
-    public NameRow ClaimCapability(string capability, string holder, string holderHost)
+    /// <param name="holderHost">Where that member is reached, or <see langword="null"/> when it has not
+    /// said. A name already following that holder keeps pointing where it does, because not having heard
+    /// is not having been told otherwise; a name moving to a holder that has not said is withdrawn rather
+    /// than left pointing at the previous one.</param>
+    public NameRow ClaimCapability(string capability, string holder, string? holderHost)
     {
         lock (_gate)
             return ClaimCapabilityLocked(capability, holder, holderHost);
     }
 
-    private NameRow ClaimCapabilityLocked(string capability, string holder, string holderHost)
+    private NameRow ClaimCapabilityLocked(string capability, string holder, string? holderHost)
     {
         string label = DnsLabel.Sanitize(capability);
         if (string.IsNullOrEmpty(label))
@@ -111,12 +114,14 @@ public sealed class NameService(
         // The same holder at the same host is the steady state, and re-writing the row on every pass
         // would make a quiet cluster look busy in the registry's timestamps.
         if (existing is not null && existing.Member == holder)
-            return Retarget(existing, holderHost);
+            return holderHost is null ? existing : Retarget(existing, holderHost);
 
-        NameRow row = Save(Row(name, NameKind.Capability, holder, capability, holderHost) with
-        {
-            RecordId = existing?.RecordId ?? "",
-        });
+        NameRow wanted = holderHost is null
+            ? Row(name, NameKind.Capability, holder, capability, publicHost: "",
+                blockedBecause: "the holder has not said where it is reached")
+            : Row(name, NameKind.Capability, holder, capability, holderHost);
+
+        NameRow row = Save(wanted with { RecordId = existing?.RecordId ?? "" });
 
         logger.LogInformation("{Name} follows {Holder}", name, holder);
         return row;

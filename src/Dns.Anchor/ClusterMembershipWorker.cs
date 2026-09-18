@@ -31,6 +31,7 @@ internal sealed class ClusterMembershipWorker(
     AnchorOptions options,
     ClusterStateStore state,
     NameService names,
+    CapabilityNames capabilities,
     RecordReconciler reconciler,
     SqliteNameRegistry registry,
     NamesAnnouncer announcer,
@@ -84,23 +85,35 @@ internal sealed class ClusterMembershipWorker(
             return;
         }
 
-        // The name this capability is reached at. An anchor holds no node name — it is reached by what
-        // it serves — so this is the only name it claims for itself. Claimed on every pass because the
-        // host can be changed in configuration and the capability can be reassigned to another member,
-        // and writing it once would leave whichever moved first behind.
-        NameRow self = names.ClaimCapability(DnsCapability.Name, options.MemberId, options.PublicHost);
+        // Every capability's name, this one's included, derived again from the assignments. Claimed on
+        // every tick because a capability can be reassigned and a holder's host can change, and writing
+        // them once would leave whichever moved first behind. A tick that moved any of them brings the
+        // zone pass forward, so a reassignment reaches the zone in seconds rather than an interval.
+        IReadOnlySet<string> touched =
+            await capabilities.SyncAsync(options.MemberId, options.PublicHost, ct).ConfigureAwait(false);
+        if (touched.Count > 0)
+            RequestZonePass();
 
-        // And a node name under this member's id is released: this member is an anchor, and a node
-        // name on it would be a second name for a machine that already has one through its node.
+        // An anchor holds no node name — it is reached by what it serves — so one found under this
+        // member's id is released: it would be a second name for a machine that already has one through
+        // its node.
         foreach (NameRow held in names.Held(options.MemberId).Where(r => r.Kind == NameKind.Member))
             names.Release(held.Name);
 
-        if (self.State == NameState.Blocked && changed)
+        if (changed
+            && names.Held(options.MemberId).FirstOrDefault(r => r.Key == DnsCapability.Name) is
+                { State: NameState.Blocked } self)
+        {
             logger.LogWarning("{Name} is not published: {Note}", self.Name, self.Note);
+        }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (now < _nextZonePass)
+        {
+            foreach (string member in touched)
+                await announcer.AnnounceAsync(member, ct).ConfigureAwait(false);
             return;
+        }
 
         _nextZonePass = now + options.Reconcile;
 
@@ -118,16 +131,18 @@ internal sealed class ClusterMembershipWorker(
             }
 
             // A pass that changed where any name stands is followed by telling each member holding one,
-            // so a node learns it is published once it is, rather than on its next statement.
+            // and each that has said where it is reached, so a member learns it is published once it is
+            // rather than on its next statement, and a member that lost a capability learns it lost the
+            // name with it.
+            IEnumerable<string> told = touched;
             if (!pass.Quiet || pass.Contested > 0)
+                told = told.Concat(registry.All().Select(r => r.Member)).Concat(registry.StatedMembers());
+
+            foreach (string member in told
+                         .Where(m => !string.Equals(m, options.MemberId, StringComparison.Ordinal))
+                         .Distinct(StringComparer.Ordinal))
             {
-                foreach (string member in registry.All()
-                             .Select(r => r.Member)
-                             .Where(m => !string.Equals(m, options.MemberId, StringComparison.Ordinal))
-                             .Distinct(StringComparer.Ordinal))
-                {
-                    await announcer.AnnounceAsync(member, ct).ConfigureAwait(false);
-                }
+                await announcer.AnnounceAsync(member, ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

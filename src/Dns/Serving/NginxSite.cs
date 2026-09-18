@@ -52,6 +52,9 @@ public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, 
     /// <summary>Whether the host is provisioned to serve generated sites at all.</summary>
     public bool Usable => options.Usable;
 
+    /// <summary>Whether this component has a generated site on disk, serving names or not.</summary>
+    public bool Serving => File.Exists(options.SitePath);
+
     /// <summary>
     /// Serve exactly these names, each with the certificate held for it.
     /// </summary>

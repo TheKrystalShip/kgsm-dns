@@ -5,6 +5,28 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0]
+
+### Added — every capability the cluster assigns has a name that follows its holder
+
+`<capability>.anchors.<zone>` is kept for every held capability, pointing at the host its holder said
+it is reached at, and re-derived from the cluster's assignments on every tick. A reassignment moves
+the record within seconds and tells both the member that lost the name and the one that gained it,
+and the holder then asks for a certificate for it the way a node asks for its own.
+
+- **Every member states its host**, anchors included. The anchor keeps the latest statement per
+  member; only a node is named from it.
+- **A holder the anchor has not heard from** keeps a name it already held where it was, because not
+  having heard is not having been told otherwise. A name moving to such a holder is withdrawn until it
+  speaks, rather than left resolving to the member that no longer holds it.
+- **A capability held by nobody loses its name.**
+- **A blocked name's record is withdrawn.** A name that cannot be published — no host, or a host
+  nobody outside could reach — no longer leaves the record it had before it was blocked.
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.4`**: the member half is any member's, and logs the set of
+  names it is reached at when that set changes. A member the anchor tells it holds nothing withdraws
+  the site it served, so the member that lost a capability stops serving its name; before the anchor's
+  first answer after a start, an empty set is not yet told and withdraws nothing.
+
 ## [0.4.0]
 
 ### Added — the anchor issues every certificate in the cluster

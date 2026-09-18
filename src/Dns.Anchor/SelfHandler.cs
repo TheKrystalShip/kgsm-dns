@@ -5,22 +5,25 @@ using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
+using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 using TheKrystalShip.KGSM.Dns.Messages;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor;
 
 /// <summary>
-/// Names a node that has said where it is reached.
+/// Records where a member says it is reached, and names it if it is a node.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Only the holder acts.</b> A member standing by drops the statement: two members writing one zone
-/// would each reconcile the other's records away. The node restates itself on a timer and whenever the
-/// holder changes, so nothing is lost by dropping it here.
+/// would each reconcile the other's records away. Every member restates itself on a timer and whenever
+/// the holder changes, so nothing is lost by dropping it here.
 /// </para>
 /// <para>
-/// <b>Only a node is named.</b> The sender's kind is read from this member's own roster, never from
-/// the message, so an anchor cannot claim a node name by saying it is a node.
+/// <b>Every member's host is kept; only a node is named.</b> Any member can hold a capability, and the
+/// capability's name points at the host its holder stated here. The sender's kind is read from this
+/// member's own roster, never from the message, so an anchor cannot claim a node name by saying it is a
+/// node.
 /// </para>
 /// <para>
 /// <b>The name is keyed on the sender, never on anything in the payload.</b> The bus has already
@@ -33,6 +36,7 @@ internal sealed class SelfHandler(
     ClusterStateStore state,
     MembersStore members,
     NameService names,
+    SqliteNameRegistry registry,
     RecordReconciler reconciler,
     ClusterMembershipWorker worker,
     NamesAnnouncer announcer,
@@ -57,10 +61,9 @@ internal sealed class SelfHandler(
         }
 
         MemberRow? sender = await members.GetByMemberIdAsync(envelope.From, ct).ConfigureAwait(false);
-        if (sender is null || !string.Equals(sender.Kind, MemberKind.Node, StringComparison.Ordinal))
+        if (sender is null)
         {
-            logger.LogInformation(
-                "{From} is not a node this member knows of — it holds no node name", envelope.From);
+            logger.LogInformation("{From} is not a member this anchor knows of — ignored", envelope.From);
             return;
         }
 
@@ -77,10 +80,31 @@ internal sealed class SelfHandler(
             return;
         }
 
-        names.ClaimMember(envelope.From, self.PublicHost);
+        // Kept for every member, because any member can be assigned a capability, and its name points
+        // wherever the holder said it is reached.
+        string? previous = registry.HostOf(envelope.From);
+        registry.StateHost(envelope.From, self.PublicHost.Trim());
 
-        // The record is written by the next zone pass, brought forward so a node joining does not wait out
-        // the whole interval; the node is told where it stands now and again once the pass has run.
+        if (string.Equals(sender.Kind, MemberKind.Node, StringComparison.Ordinal))
+        {
+            names.ClaimMember(envelope.From, self.PublicHost);
+        }
+        else
+        {
+            // An anchor is reached by the capability it holds, never by a node name.
+            foreach (NameRow held in names.Held(envelope.From).Where(r => r.Kind == NameKind.Member))
+                names.Release(held.Name);
+        }
+
+        if (!string.Equals(previous, self.PublicHost.Trim(), StringComparison.Ordinal))
+        {
+            logger.LogInformation(
+                "{From} is reached at {Host}", envelope.From,
+                string.IsNullOrWhiteSpace(self.PublicHost) ? "(no public host)" : self.PublicHost.Trim());
+        }
+
+        // The record is written by the next zone pass, brought forward so a member joining does not wait
+        // out the whole interval; the member is told where it stands now and again once the pass has run.
         worker.RequestZonePass();
         await announcer.AnnounceAsync(envelope.From, ct).ConfigureAwait(false);
     }

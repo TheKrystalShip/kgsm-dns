@@ -40,14 +40,15 @@ public sealed class DnsNamesHandler(
             return;
         }
 
-        string? before = book.NodeName;
+        string before = string.Join(", ", book.Published.Order(StringComparer.Ordinal));
         book.Replace(names.Names);
+        string now = string.Join(", ", book.Published.Order(StringComparer.Ordinal));
 
         // A name that became published needs a certificate, and one that went away needs to stop being
         // served; either way the keeper's next pass is now rather than at its interval.
         keeper.Wake();
 
-        if (!string.Equals(before, book.NodeName, StringComparison.Ordinal) && book.NodeName is { } now)
-            logger.LogInformation("this node is reached at {Name}", now);
+        if (!string.Equals(before, now, StringComparison.Ordinal))
+            logger.LogInformation("this member is reached at {Names}", now.Length > 0 ? now : "(no published name)");
     }
 }

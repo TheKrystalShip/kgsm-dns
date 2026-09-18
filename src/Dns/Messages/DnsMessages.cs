@@ -7,7 +7,7 @@ namespace TheKrystalShip.KGSM.Dns.Messages;
 public static class DnsMessageTypes
 {
     /// <summary>
-    /// A node to the DNS anchor: where this node is reached from the internet. Sent whole every time,
+    /// A member to the DNS anchor: where this member is reached from the internet. Sent whole every time,
     /// so the latest one is the whole truth and a lost or repeated one changes nothing.
     /// </summary>
     public const string Self = "dns.self";
@@ -38,10 +38,11 @@ public sealed record DnsCsr(string Name, string Csr);
 /// <param name="Chain">The PEM chain, leaf first.</param>
 public sealed record DnsCert(string Name, string Chain);
 
-/// <summary>What a node says about itself.</summary>
+/// <summary>What a member says about itself.</summary>
 /// <param name="PublicHost">
-/// Where the node is reached from the internet: normally its network's dynamic-DNS name, or a fixed
-/// public address. Empty is a real answer — a node that states no host is named but not published.
+/// Where the member is reached from the internet: normally its network's dynamic-DNS name, or a fixed
+/// public address. A node is named from it, and every capability the member holds points at it. Empty
+/// is a real answer — a member that states no host holds its names unpublished.
 /// </param>
 public sealed record DnsSelf(string PublicHost);
 

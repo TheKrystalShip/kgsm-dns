@@ -112,11 +112,23 @@ public sealed class RecordReconciler(
 
             // A row with nothing to point at is a state, not a record: a member whose address nobody has
             // observed, or a name whose whole numbered series is held. Publishing a guess would be worse
-            // than publishing nothing.
-            if (row.State == NameState.Blocked || string.IsNullOrEmpty(row.Content))
-                continue;
-
+            // than publishing nothing. A record this cluster published for the name before it was blocked
+            // is withdrawn with it: a capability that moved to a holder nobody has heard from yet would
+            // otherwise keep resolving to the member that no longer holds it.
             byName.TryGetValue(row.Name, out ProviderRecord? held);
+
+            if (row.State == NameState.Blocked || string.IsNullOrEmpty(row.Content))
+            {
+                if (held?.Mark is not null)
+                {
+                    await provider.DeleteAsync(held.Id, ct).ConfigureAwait(false);
+                    registry.Put(row with { RecordId = "", UpdatedAt = DateTimeOffset.UtcNow });
+                    logger.LogInformation("withdrew {Name}: {Note}", row.Name, row.Note);
+                    removed++;
+                }
+
+                continue;
+            }
 
             if (held is null)
             {
