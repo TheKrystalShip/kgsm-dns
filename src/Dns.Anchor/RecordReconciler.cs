@@ -28,10 +28,11 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// changes anything. Nothing has to move between the old holder and the new one.
 /// </para>
 /// <para>
-/// <b>Recovery is a first-pass act, and only when the registry is empty.</b> Once this member has read
-/// its registry, an empty one means every name was released — which looks identical to an unbuilt one
-/// and must not be answered the same way, or a name given up would be rebuilt from the record it is
-/// about to withdraw and never go away.
+/// <b>Recovery happens once, before anything is claimed, and only when the registry is empty.</b>
+/// Once this member has read its registry, an empty one means every name was released — which looks
+/// identical to an unbuilt one and must not be answered the same way, or a name given up would be
+/// rebuilt from the record it is about to withdraw and never go away. And it precedes every claim,
+/// because a claim against an unread registry draws a new name for a member the zone already names.
 /// </para>
 /// </remarks>
 public sealed class RecordReconciler(
@@ -54,21 +55,50 @@ public sealed class RecordReconciler(
     }
 
     private bool _read;
+    private int _recovered;
+
+    /// <summary>Whether this member has read its registry against the zone yet.</summary>
+    public bool Ready => _read;
+
+    /// <summary>
+    /// Read the registry against the zone once, rebuilding it from the marks when it is empty.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called before anything claims a name. A claim against an unread registry draws a fresh name for
+    /// a member that already holds one in the zone — and the next pass then withdraws the name that
+    /// member was reached at, which is the exact loss the marks exist to prevent.
+    /// </para>
+    /// <para>
+    /// A failed read leaves the member unready, so the caller claims nothing and asks again on the next
+    /// pass. "Could not read the zone" is not "the zone holds nothing".
+    /// </para>
+    /// </remarks>
+    public async Task EnsureReadyAsync(CancellationToken ct)
+    {
+        if (_read)
+            return;
+
+        IReadOnlyList<ProviderRecord> zone = await provider.ListAsync(ct).ConfigureAwait(false);
+
+        if (registry.All().Count == 0)
+            _recovered = Recover(Ours(zone));
+
+        _read = true;
+    }
 
     /// <summary>Run one pass.</summary>
     public async Task<Pass> RunAsync(CancellationToken ct)
     {
+        await EnsureReadyAsync(ct).ConfigureAwait(false);
+
         IReadOnlyList<ProviderRecord> zone = await provider.ListAsync(ct).ConfigureAwait(false);
+        List<ProviderRecord> ours = Ours(zone);
 
-        // Only what is inside the cluster's bases is considered at all, so a record elsewhere in the
-        // zone is not even a candidate for being read as one of ours.
-        List<ProviderRecord> ours =
-            [.. zone.Where(r => bases.Owns(r.Name) && r.Mark is not null)];
-
-        bool cold = !_read && registry.All().Count == 0;
-        _read = true;
-
-        int recovered = cold ? Recover(ours) : 0;
+        // Reported on the first pass after it happened, so a recovery appears in the same line as
+        // everything else a pass did.
+        int recovered = _recovered;
+        _recovered = 0;
 
         var byName = new Dictionary<string, ProviderRecord>(StringComparer.OrdinalIgnoreCase);
         foreach (ProviderRecord record in zone)
@@ -226,6 +256,13 @@ public sealed class RecordReconciler(
             UpdatedAt = DateTimeOffset.UtcNow,
         });
     }
+
+    /// <summary>
+    /// The records that are this cluster's: inside one of its bases and carrying its mark. A record
+    /// elsewhere in the zone is not even a candidate for being read as one of ours.
+    /// </summary>
+    private List<ProviderRecord> Ours(IReadOnlyList<ProviderRecord> zone) =>
+        [.. zone.Where(r => bases.Owns(r.Name) && r.Mark is not null)];
 
     private DesiredRecord Desired(NameRow row) =>
         new(row.Name, row.Type, row.Content, ttlSeconds, row.Mark.ToString());

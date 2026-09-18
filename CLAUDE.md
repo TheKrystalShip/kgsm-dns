@@ -31,9 +31,11 @@ component becoming something else.
   ours.
 - **The registry is desired state; the zone is reconciled to it.** One direction. The single thing the
   provider is authoritative for is its own handle for a record.
-- **Recovery is a first-pass act on an empty registry.** Once a member has read its registry, empty
-  means everything was released — which looks identical to an unbuilt registry and must not be
-  answered the same way, or a released name would be rebuilt from the record it is about to withdraw.
+- **Recovery happens once, before anything is claimed, on an empty registry.** Once a member has read
+  its registry, empty means everything was released — which looks identical to an unbuilt registry
+  and must not be answered the same way, or a released name would be rebuilt from the record it is
+  about to withdraw. And it precedes every claim: a claim against an unread registry draws a new name
+  for a member the zone already names, and the next pass withdraws the one it is reached at.
 - **A name is sticky.** A member keeps it across restarts and address changes. Certificates, game
   names and people's bookmarks all name it.
 - **Nothing is published against a guess.** A member with no observed address, or a label whose whole

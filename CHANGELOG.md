@@ -5,6 +5,19 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1]
+
+### Fixed — a holder that lost its store keeps its name
+
+The registry is read against the zone before anything claims a name. A holder whose store was gone
+drew itself a fresh name on its first pass, and the reconcile after it withdrew the name the zone
+already carried for that member — measured on the live zone, where a restart with an empty store
+renamed the anchor and deleted its record. The claim now waits for the read, and a holder that cannot
+read the zone claims nothing until it can.
+
+A refusal for a name another record holds is recognised by the provider's error code rather than its
+wording, which is prose the provider is free to rephrase.
+
 ## [0.1.0]
 
 ### Added — the anchor publishes

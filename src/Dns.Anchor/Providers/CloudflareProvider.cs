@@ -89,16 +89,17 @@ public sealed class CloudflareProvider(
             CloudflareJsonContext.Default.CloudflareRecordWrite,
             ct).ConfigureAwait(false);
 
-        // A name already held answers 400 with the provider's own wording. It is a state, not a
-        // failure: the caller picks the next label and tries again.
+        // A name already held answers 400 with one of two codes: 81053 when an address or CNAME record
+        // holds it, 81054 when a CNAME does and the new record is not one. It is a state, not a
+        // failure: the caller picks the next label. Matched on the code rather than the message,
+        // because the wording is prose the provider is free to rephrase.
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
-            string detail = await Detail(response, ct).ConfigureAwait(false);
-            if (detail.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                || detail.Contains("conflicts with", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new DnsNameTakenException(record.Name, detail);
-            }
+            string raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            if (ErrorCodes(raw).Any(code => code is NameHeldByRecord or NameHeldByCname))
+                throw new DnsNameTakenException(record.Name, Summarize(raw, response));
+
+            throw new DnsProviderException($"the provider answered 400: {Summarize(raw, response)}");
         }
 
         CloudflareRecordResponse body = await ReadAsync(
@@ -206,33 +207,63 @@ public sealed class CloudflareProvider(
         try
         {
             string raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(raw))
-                return response.ReasonPhrase ?? "no detail";
-
-            using JsonDocument document = JsonDocument.Parse(raw);
-            if (document.RootElement.TryGetProperty("errors", out JsonElement errors)
-                && errors.ValueKind == JsonValueKind.Array)
-            {
-                var messages = new List<string>();
-                foreach (JsonElement error in errors.EnumerateArray())
-                {
-                    if (error.TryGetProperty("message", out JsonElement message)
-                        && message.ValueKind == JsonValueKind.String)
-                    {
-                        messages.Add(message.GetString() ?? "");
-                    }
-                }
-
-                if (messages.Count > 0)
-                    return string.Join("; ", messages);
-            }
-
-            return raw.Length > 400 ? raw[..400] : raw;
+            return Summarize(raw, response);
         }
-        catch (Exception ex) when (ex is JsonException or HttpRequestException or OperationCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
         {
             return response.ReasonPhrase ?? "no detail";
         }
+    }
+
+    /// <summary>A name is held by an address or <c>CNAME</c> record.</summary>
+    private const int NameHeldByRecord = 81053;
+
+    /// <summary>A name is held by a <c>CNAME</c>, which may share it with nothing.</summary>
+    private const int NameHeldByCname = 81054;
+
+    private static string Summarize(string raw, HttpResponseMessage response)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return response.ReasonPhrase ?? "no detail";
+
+        List<string> messages = [.. Errors(raw).Select(e => e.Message).Where(m => m.Length > 0)];
+        if (messages.Count > 0)
+            return string.Join("; ", messages);
+
+        return raw.Length > 400 ? raw[..400] : raw;
+    }
+
+    private static IEnumerable<int> ErrorCodes(string raw) => Errors(raw).Select(e => e.Code);
+
+    private static List<(int Code, string Message)> Errors(string raw)
+    {
+        var found = new List<(int, string)>();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(raw);
+            if (!document.RootElement.TryGetProperty("errors", out JsonElement errors)
+                || errors.ValueKind != JsonValueKind.Array)
+            {
+                return found;
+            }
+
+            foreach (JsonElement error in errors.EnumerateArray())
+            {
+                int code = error.TryGetProperty("code", out JsonElement c) && c.ValueKind == JsonValueKind.Number
+                    ? c.GetInt32()
+                    : 0;
+                string message = error.TryGetProperty("message", out JsonElement m) && m.ValueKind == JsonValueKind.String
+                    ? m.GetString() ?? ""
+                    : "";
+                found.Add((code, message));
+            }
+        }
+        catch (JsonException)
+        {
+            // Not the provider's error shape. The raw text is still reported by the caller.
+        }
+
+        return found;
     }
 }
 

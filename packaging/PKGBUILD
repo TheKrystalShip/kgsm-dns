@@ -10,7 +10,7 @@
 # against — on its own version. The daemon is the one deployable, and it is what this ships.
 
 pkgname=kgsm-dns
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="KGSM DNS anchor — the names a cluster is reached at, and the one holder of its zone credential"
 arch=('x86_64')

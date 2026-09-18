@@ -172,6 +172,28 @@ public sealed class ReconcilerTests : IDisposable
     }
 
     [Fact]
+    public async Task A_holder_that_lost_its_store_keeps_the_name_the_zone_gives_it()
+    {
+        // The order a holder runs in: read the zone, then claim. Claiming first draws a new name for a
+        // member the zone already names, and the pass after withdraws the one it is reached at.
+        NameRow original = _names.ClaimMember("node-a", "203.0.113.10");
+        await _reconciler.RunAsync(CancellationToken.None);
+
+        _registry.Remove(original.Name);
+        var successor = new RecordReconciler(
+            _registry, _provider, Bases, ttlSeconds: 60, NullLogger<RecordReconciler>.Instance);
+
+        await successor.EnsureReadyAsync(CancellationToken.None);
+        NameRow claimed = _names.ClaimMember("node-a", "203.0.113.10");
+        RecordReconciler.Pass pass = await successor.RunAsync(CancellationToken.None);
+
+        Assert.Equal(original.Name, claimed.Name);
+        Assert.Equal(1, pass.Recovered);
+        Assert.Equal(0, pass.Removed);
+        Assert.NotNull(_provider.Find(original.Name));
+    }
+
+    [Fact]
     public async Task Releasing_the_last_name_does_not_read_as_an_unbuilt_registry()
     {
         // The two states look identical — an empty registry beside a marked record — so an anchor that

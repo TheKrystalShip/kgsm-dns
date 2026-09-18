@@ -63,6 +63,19 @@ internal sealed class ClusterMembershipWorker(
 
         _saidUnconfigured = false;
 
+        // The registry is read against the zone before anything is claimed. A holder whose store was
+        // lost would otherwise draw itself a new name and then withdraw the one it is reached at. Until
+        // the zone can be read, nothing is claimed and the next pass asks again.
+        try
+        {
+            await reconciler.EnsureReadyAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "the zone could not be read — claiming nothing until it can be");
+            return;
+        }
+
         // This anchor's own name, and the name its capability is reached at. Claimed on every pass
         // because both are derived: the address can move, and the capability can be reassigned to
         // another member, so writing them once would leave whichever moved first behind.

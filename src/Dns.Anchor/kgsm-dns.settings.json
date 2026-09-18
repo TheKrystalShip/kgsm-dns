@@ -67,9 +67,13 @@
     "ConfigDescriptorPath": "/var/lib/kgsm/anchors/dns-anchor.json"
   },
 
+  // The framework's own request logging is a line per call, and this daemon calls the provider on
+  // every pass. What it did to the zone is logged by this daemon itself, one line per change.
   "Logging": {
     "LogLevel": {
-      "Default": "Information"
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "System.Net.Http.HttpClient": "Warning"
     }
   }
 }
