@@ -17,6 +17,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// </remarks>
 public sealed class NamesAnnouncer(
     SqliteNameRegistry registry,
+    Names.PortCollisions collisions,
     MembersStore members,
     IClusterBus bus,
     ILogger<NamesAnnouncer> logger)
@@ -41,7 +42,8 @@ public sealed class NamesAnnouncer(
                 Kind: NameKinds.Spell(n.Kind),
                 Key: n.Key,
                 State: Spell(n.State),
-                Note: n.Note)),
+                Note: n.Note,
+                Collisions: n.Kind == NameKind.Game ? collisions.For(n.Name) : null)),
         ];
 
         await bus.EnqueueAsync(

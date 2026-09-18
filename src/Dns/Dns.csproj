@@ -12,7 +12,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns</RootNamespace>
     <AssemblyName>TheKrystalShip.KGSM.Dns</AssemblyName>
-    <Version>0.2.0-dev.5</Version>
+    <Version>0.2.0-dev.6</Version>
 
     <PackageId>TheKrystalShip.KGSM.Dns</PackageId>
     <Authors>TheKrystalShip</Authors>

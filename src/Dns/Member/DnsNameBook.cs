@@ -52,6 +52,15 @@ public sealed class DnsNameBook : Serving.IServedNames
             && string.Equals(n.Key, instance, StringComparison.Ordinal)
             && n.Published)?.Name;
 
+    /// <summary>
+    /// The other members' game servers wanting one of this server's ports on the same public address:
+    /// empty when there are none, null when the anchor could not tell or has named no such server.
+    /// </summary>
+    /// <param name="instance">The instance id.</param>
+    public IReadOnlyList<DnsCollision>? GameCollisions(string instance) =>
+        _names.FirstOrDefault(n => n.Kind == NameKinds.Spell(NameKind.Game)
+            && string.Equals(n.Key, instance, StringComparison.Ordinal))?.Collisions;
+
     /// <summary>Replace everything with what the anchor just said.</summary>
     public void Replace(IReadOnlyList<DnsNameEntry> names)
     {

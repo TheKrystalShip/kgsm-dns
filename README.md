@@ -51,6 +51,11 @@ same game already holds the name anywhere in the cluster (`factorio`, `factorio-
 missing from the set has been uninstalled and loses its name. A game name is an alias of its node's
 name, so it follows the node wherever the node's own name points.
 
+Nodes behind one router share one public address and one port space. On every zone pass the anchor
+resolves each node's host and flags every pair of servers on different nodes that share an address and
+declare an overlapping port on the same protocol, on both, telling each node about its own. The names
+stay published. A server that could not be checked is reported as unknown, never as clear.
+
 Every record carries a mark saying which cluster name it is and who holds it. A record without one
 is never edited, deleted, or counted as satisfying a name: a zone holds records people made by hand,
 and the name alone is not evidence of who made it. The marks are also what the registry is rebuilt

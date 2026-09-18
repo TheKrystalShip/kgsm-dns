@@ -56,6 +56,27 @@ public sealed class MessageTests
     }
 
     [Fact]
+    public void A_game_names_collisions_ride_the_names_and_absence_reads_as_unknown()
+    {
+        var sent = new DnsNames([
+            new DnsNameEntry("minecraft.play.example.com", "game", "mc-1", "published", "",
+                [new DnsCollision("minecraft-2.play.example.com", "node-b", 25565, 25565, "tcp")]),
+        ]);
+        string json = JsonSerializer.Serialize(sent, DnsJsonContext.Default.DnsNames);
+
+        var book = new DnsNameBook();
+        using (JsonDocument document = JsonDocument.Parse(json))
+            book.Replace(DnsJsonContext.Read(document.RootElement, DnsJsonContext.Default.DnsNames)!.Names);
+        Assert.Equal("node-b", Assert.Single(book.GameCollisions("mc-1")!).Member);
+
+        // A payload from an anchor that says nothing about collisions has not said there are none.
+        using JsonDocument older = JsonDocument.Parse(
+            "{\"names\":[{\"name\":\"minecraft.play.example.com\",\"kind\":\"game\",\"key\":\"mc-1\",\"state\":\"published\",\"note\":\"\"}]}");
+        book.Replace(DnsJsonContext.Read(older.RootElement, DnsJsonContext.Default.DnsNames)!.Names);
+        Assert.Null(book.GameCollisions("mc-1"));
+    }
+
+    [Fact]
     public void Not_yet_told_and_told_nothing_are_different_answers()
     {
         // A member that has not heard from the anchor since it started keeps serving what it served; one

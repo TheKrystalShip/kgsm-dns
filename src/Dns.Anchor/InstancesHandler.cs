@@ -5,6 +5,7 @@ using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
+using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 using TheKrystalShip.KGSM.Dns.Messages;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor;
@@ -28,6 +29,7 @@ internal sealed class InstancesHandler(
     ClusterStateStore state,
     MembersStore members,
     NameService names,
+    SqliteNameRegistry registry,
     RecordReconciler reconciler,
     ClusterMembershipWorker worker,
     NamesAnnouncer announcer,
@@ -77,7 +79,11 @@ internal sealed class InstancesHandler(
                 continue;
 
             keep.Add(instance.Instance);
-            names.ClaimGame(envelope.From, instance.Instance, instance.Blueprint ?? "");
+            NameRow row = names.ClaimGame(envelope.From, instance.Instance, instance.Blueprint ?? "");
+
+            // Kept beside the name for what the ports are read for: which servers on one public address
+            // want the same one.
+            registry.SetPorts(row.Name, instance.Ports ?? []);
         }
 
         names.ReleaseGamesExcept(envelope.From, keep);

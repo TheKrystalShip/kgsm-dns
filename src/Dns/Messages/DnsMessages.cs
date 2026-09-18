@@ -74,12 +74,32 @@ public sealed record DnsSelf(string PublicHost);
 /// <param name="Key">The capability or instance within the member, empty for a node's own name.</param>
 /// <param name="State">`pending`, `published` or `blocked`.</param>
 /// <param name="Note">Why a blocked name is blocked. Empty otherwise.</param>
-public sealed record DnsNameEntry(string Name, string Kind, string Key, string State, string Note)
+/// <param name="Collisions">For a game name: every game server on another member reached at the same
+/// public address that declares an overlapping port on the same protocol. Empty when there is none;
+/// null when it could not be told, because a host involved could not be resolved — and for every name
+/// that is not a game name.</param>
+public sealed record DnsNameEntry(
+    string Name, string Kind, string Key, string State, string Note,
+    IReadOnlyList<DnsCollision>? Collisions = null)
 {
     /// <summary>Whether the provider holds the record, so the name resolves.</summary>
     [JsonIgnore]
     public bool Published => string.Equals(State, "published", StringComparison.Ordinal);
 }
+
+/// <summary>
+/// Another member's game server that wants the same port as this one on the same public address.
+/// </summary>
+/// <remarks>
+/// A report, not a refusal: both names stay published. Whether both servers can run at once is decided by
+/// the router in front of that address and the hosts behind it, not by DNS.
+/// </remarks>
+/// <param name="Name">The other server's game name.</param>
+/// <param name="Member">The member it runs on.</param>
+/// <param name="Start">The first port both declare.</param>
+/// <param name="End">The last port both declare.</param>
+/// <param name="Protocol">`tcp` or `udp`.</param>
+public sealed record DnsCollision(string Name, string Member, int Start, int End, string Protocol);
 
 /// <summary>Every name the anchor holds for one member.</summary>
 /// <param name="Names">The complete set. An empty list means the member holds no name.</param>
@@ -95,6 +115,7 @@ public sealed record DnsNames(IReadOnlyList<DnsNameEntry> Names);
 [JsonSerializable(typeof(DnsCsr))]
 [JsonSerializable(typeof(DnsCert))]
 [JsonSerializable(typeof(DnsInstances))]
+[JsonSerializable(typeof(DnsCollision))]
 public sealed partial class DnsJsonContext : JsonSerializerContext
 {
     /// <summary>Read a payload off an envelope, or <see langword="null"/> when it is not that shape.</summary>

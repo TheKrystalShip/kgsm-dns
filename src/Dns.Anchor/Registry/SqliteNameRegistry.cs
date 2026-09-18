@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 using TheKrystalShip.KGSM.Dns;
+using TheKrystalShip.KGSM.Dns.Messages;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Registry;
 
@@ -14,8 +15,9 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Registry;
 /// <para>
 /// The registry is the authority for what the zone should say, and the provider is reconciled to it.
 /// It is also recoverable: every name is derivable from the marks on the records themselves, so a
-/// member that takes the capability rebuilds it rather than inheriting a file. The stated hosts are not
-/// in the zone and are not recovered; every member restates its host when the capability moves.
+/// member that takes the capability rebuilds it rather than inheriting a file. The stated hosts and the
+/// ports each game server declares are not in the zone and are not recovered; every member restates
+/// them when the capability moves.
 /// </para>
 /// <para>
 /// SQLite is single-writer, so writes serialise through a process lock while WAL keeps reads
@@ -67,6 +69,10 @@ public sealed class SqliteNameRegistry
             );
             CREATE INDEX IF NOT EXISTS idx_names_member ON names (member);
             CREATE INDEX IF NOT EXISTS idx_names_kind ON names (kind);
+            CREATE TABLE IF NOT EXISTS game_ports (
+                name       TEXT PRIMARY KEY,
+                ports      TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS hosts (
                 member     TEXT PRIMARY KEY,
                 host       TEXT NOT NULL,
@@ -178,10 +184,67 @@ public sealed class SqliteNameRegistry
         {
             using SqliteConnection connection = Open();
             using SqliteCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DELETE FROM names WHERE name = $name";
+            cmd.CommandText = "DELETE FROM names WHERE name = $name; DELETE FROM game_ports WHERE name = $name;";
             cmd.Parameters.AddWithValue("$name", name);
             cmd.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>Record the ports a game server declares, as its node last said.</summary>
+    /// <remarks>
+    /// Not in the zone and not recovered from it, like the stated hosts: a node restates its servers when
+    /// the capability moves and on its own refresh.
+    /// </remarks>
+    public void SetPorts(string name, IReadOnlyList<DnsPort> ports)
+    {
+        string text = string.Join(';', ports.Select(p =>
+            string.Create(CultureInfo.InvariantCulture, $"{p.Start}-{p.End}/{p.Protocol}")));
+
+        lock (_writeGate)
+        {
+            using SqliteConnection connection = Open();
+            using SqliteCommand cmd = connection.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO game_ports (name, ports) VALUES ($name, $ports)
+                ON CONFLICT(name) DO UPDATE SET ports = excluded.ports
+                """;
+            cmd.Parameters.AddWithValue("$name", name);
+            cmd.Parameters.AddWithValue("$ports", text);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>Every game name's declared ports.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<DnsPort>> AllPorts()
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT name, ports FROM game_ports";
+        var result = new Dictionary<string, IReadOnlyList<DnsPort>>(StringComparer.Ordinal);
+        using SqliteDataReader reader = cmd.ExecuteReader();
+        while (reader.Read())
+            result[reader.GetString(0)] = ParsePorts(reader.GetString(1));
+        return result;
+    }
+
+    private static List<DnsPort> ParsePorts(string text)
+    {
+        var ports = new List<DnsPort>();
+        foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int slash = part.IndexOf('/');
+            int dash = part.IndexOf('-');
+            if (slash < 0 || dash < 0 || dash > slash)
+                continue;
+            if (int.TryParse(part[..dash], NumberStyles.Integer, CultureInfo.InvariantCulture, out int start)
+                && int.TryParse(part[(dash + 1)..slash], NumberStyles.Integer, CultureInfo.InvariantCulture, out int end))
+            {
+                ports.Add(new DnsPort(start, end, part[(slash + 1)..]));
+            }
+        }
+
+        return ports;
     }
 
     /// <summary>

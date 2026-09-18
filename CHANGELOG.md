@@ -5,6 +5,25 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0]
+
+### Added — game servers that want one port behind one router are flagged
+
+Members behind one router share one public address and one port space. The anchor keeps the ports each
+game server declares, resolves every node's stated host on each zone pass, and flags every pair of
+servers on different nodes that share an address and declare an overlapping port on the same protocol,
+on both. The names stay published: which of the two runs is the router's and the hosts' to decide.
+
+- **Carried to the owner on `dns.names`**: each game name's entry has `collisions` — the other server,
+  its member and the ports both want — so the node can show them beside the server.
+- **Unknown is not none.** A node with no stated host or an unresolvable one, a server whose ports the
+  anchor has not been told, and every server that could share an address with either, carry null rather
+  than an empty list. A node that stated it has no public host shares no address with anything.
+- **Two servers on one node are not compared**; the engine answers for those.
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.6`**: `DnsCollision`, `DnsNameEntry.Collisions`, and
+  `DnsNameBook.GameCollisions(instance)`. An entry from an anchor that says nothing about collisions
+  reads as unknown.
+
 ## [0.6.0]
 
 ### Added — every game server has a name players connect through

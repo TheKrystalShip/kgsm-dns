@@ -32,6 +32,7 @@ internal sealed class ClusterMembershipWorker(
     ClusterStateStore state,
     NameService names,
     CapabilityNames capabilities,
+    PortCollisions collisions,
     RecordReconciler reconciler,
     SqliteNameRegistry registry,
     NamesAnnouncer announcer,
@@ -139,7 +140,12 @@ internal sealed class ClusterMembershipWorker(
             // and each that has said where it is reached, so a member learns it is published once it is
             // rather than on its next statement, and a member that lost a capability learns it lost the
             // name with it.
-            IEnumerable<string> told = touched;
+            //
+            // Port collisions are checked on the same cadence — hosts are resolved again each time, since a
+            // dynamic-DNS name moves with the address behind it — and a member whose servers' collisions
+            // changed is told as well.
+            IReadOnlySet<string> collided = await collisions.RefreshAsync(ct).ConfigureAwait(false);
+            IEnumerable<string> told = touched.Concat(collided);
             if (!pass.Quiet || pass.Contested > 0)
                 told = told.Concat(registry.All().Select(r => r.Member)).Concat(registry.StatedMembers());
 
