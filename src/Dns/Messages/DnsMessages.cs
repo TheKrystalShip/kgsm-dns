@@ -26,7 +26,29 @@ public static class DnsMessageTypes
 
     /// <summary>The DNS anchor to a member: the certificate chain issued for one of its names.</summary>
     public const string Cert = "dns.cert";
+
+    /// <summary>
+    /// A node to the DNS anchor: every game server installed on it. The complete set, sent only from a
+    /// successful read, so an instance missing from it has been uninstalled and its name is released.
+    /// </summary>
+    public const string Instances = "dns.instances";
 }
+
+/// <summary>One port range a game server listens on.</summary>
+/// <param name="Start">The first port.</param>
+/// <param name="End">The last port; equal to <paramref name="Start"/> for a single port.</param>
+/// <param name="Protocol">`tcp` or `udp`.</param>
+public sealed record DnsPort(int Start, int End, string Protocol);
+
+/// <summary>One game server on a node.</summary>
+/// <param name="Instance">The instance id, which the engine mints at install and never changes.</param>
+/// <param name="Blueprint">The game it runs; its name is suggested from this.</param>
+/// <param name="Ports">Every port it declares.</param>
+public sealed record DnsInstance(string Instance, string Blueprint, IReadOnlyList<DnsPort> Ports);
+
+/// <summary>Every game server on one node.</summary>
+/// <param name="Instances">The complete set. An empty list is a node with none installed.</param>
+public sealed record DnsInstances(IReadOnlyList<DnsInstance> Instances);
 
 /// <summary>A signing request for one name.</summary>
 /// <param name="Name">The name the certificate is for, which the member must hold.</param>
@@ -72,6 +94,7 @@ public sealed record DnsNames(IReadOnlyList<DnsNameEntry> Names);
 [JsonSerializable(typeof(DnsNameEntry))]
 [JsonSerializable(typeof(DnsCsr))]
 [JsonSerializable(typeof(DnsCert))]
+[JsonSerializable(typeof(DnsInstances))]
 public sealed partial class DnsJsonContext : JsonSerializerContext
 {
     /// <summary>Read a payload off an envelope, or <see langword="null"/> when it is not that shape.</summary>

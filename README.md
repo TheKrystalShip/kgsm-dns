@@ -45,6 +45,12 @@ again from the cluster's assignments every few seconds, so reassigning a capabil
 the new holder is told it holds it and asks for its certificate. A capability held by nobody has no
 name.
 
+A node tells the anchor every game server its engine reports, as a complete set and only from a read
+that succeeded. Each is named after its game, with the lowest free suffix when another server of the
+same game already holds the name anywhere in the cluster (`factorio`, `factorio-2`), and a server
+missing from the set has been uninstalled and loses its name. A game name is an alias of its node's
+name, so it follows the node wherever the node's own name points.
+
 Every record carries a mark saying which cluster name it is and who holds it. A record without one
 is never edited, deleted, or counted as satisfying a name: a zone holds records people made by hand,
 and the name alone is not evidence of who made it. The marks are also what the registry is rebuilt

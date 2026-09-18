@@ -127,6 +127,138 @@ public sealed class NameService(
         return row;
     }
 
+    /// <summary>
+    /// The name players reach one game server at, drawn on first sight and kept from then on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The label is the game — the blueprint reduced to a label — with the lowest free numbered suffix
+    /// when another server holds it, so the second Factorio in a cluster is <c>factorio-2</c> whichever
+    /// node it is on. A name is keyed on the node and the instance, so a node restating its servers keeps
+    /// every name it already has.
+    /// </para>
+    /// <para>
+    /// The record is an alias of the node's own name, so a node's address change moves one record and
+    /// none of its game names. A node with no name, or one that cannot be published, has game names that
+    /// are blocked rather than pointing at a guess.
+    /// </para>
+    /// </remarks>
+    /// <param name="member">The node the server is on.</param>
+    /// <param name="instance">The instance id.</param>
+    /// <param name="blueprint">The game it runs.</param>
+    public NameRow ClaimGame(string member, string instance, string blueprint)
+    {
+        lock (_gate)
+        {
+            NameRow? existing = registry.FindFor(NameKind.Game, member, instance);
+            if (existing is not null)
+                return RetargetGameLocked(existing);
+
+            string label = DnsLabel.FirstFree(DnsLabel.Sanitize(blueprint), candidate =>
+                registry.Holds(bases.Compose(NameKind.Game, candidate)));
+
+            if (string.IsNullOrEmpty(label))
+            {
+                string fallback = DnsLabel.Sanitize(instance);
+                return Save(GameRow(
+                    bases.Compose(NameKind.Game, "unnamed-" + (fallback.Length > 0 ? fallback : "instance")),
+                    member, instance,
+                    blockedBecause: "no label is free for this game — every numbered name in its series is held"));
+            }
+
+            NameRow row = Save(GameRow(bases.Compose(NameKind.Game, label), member, instance));
+            logger.LogInformation("{Instance} on {Member} is named {Name}", instance, member, row.Name);
+            return row;
+        }
+    }
+
+    /// <summary>
+    /// Give up every game name a node holds for an instance it no longer has.
+    /// </summary>
+    /// <param name="member">The node.</param>
+    /// <param name="keep">The instances it still has.</param>
+    /// <returns>The names released.</returns>
+    public IReadOnlyList<string> ReleaseGamesExcept(string member, IReadOnlySet<string> keep)
+    {
+        var released = new List<string>();
+        lock (_gate)
+        {
+            foreach (NameRow row in registry.ForMember(member)
+                         .Where(r => r.Kind == NameKind.Game && !keep.Contains(r.Key)))
+            {
+                registry.Remove(row.Name);
+                released.Add(row.Name);
+            }
+        }
+
+        foreach (string name in released)
+            logger.LogInformation("released {Name}", name);
+
+        return released;
+    }
+
+    /// <summary>
+    /// Bring every game name to where its node's own name stands, for a node whose name was drawn,
+    /// blocked or published since.
+    /// </summary>
+    /// <returns>The members whose game names changed.</returns>
+    public IReadOnlySet<string> RetargetGames()
+    {
+        var touched = new HashSet<string>(StringComparer.Ordinal);
+        lock (_gate)
+        {
+            foreach (NameRow row in registry.OfKind(NameKind.Game))
+            {
+                if (!ReferenceEquals(RetargetGameLocked(row), row))
+                    touched.Add(row.Member);
+            }
+        }
+
+        return touched;
+    }
+
+    private NameRow RetargetGameLocked(NameRow row)
+    {
+        // A name that could not be drawn stays blocked for its own reason; only the node's standing moves.
+        if (row.Name.StartsWith("unnamed-", StringComparison.Ordinal))
+            return row;
+
+        NameRow wanted = GameRow(row.Name, row.Member, row.Key) with { RecordId = row.RecordId };
+
+        bool same = string.Equals(wanted.Content, row.Content, StringComparison.Ordinal)
+            && (wanted.State == NameState.Blocked) == (row.State == NameState.Blocked);
+
+        return same ? row : Save(wanted);
+    }
+
+    /// <summary>
+    /// The row a game name should be, given where its node's own name stands.
+    /// </summary>
+    /// <remarks>
+    /// A node name still waiting for its record is usable: the alias resolves as soon as the node's record
+    /// exists, and blocking on it would withdraw every game name on a node each time its host moved.
+    /// </remarks>
+    private NameRow GameRow(string name, string member, string instance, string? blockedBecause = null)
+    {
+        NameRow? node = registry.FindFor(NameKind.Member, member, key: "");
+        string? reason = blockedBecause
+            ?? (node is null ? "the node has no name of its own"
+                : node.State == NameState.Blocked ? "the node's own name is not published: " + node.Note
+                : null);
+
+        return new NameRow(
+            Name: name,
+            Kind: NameKind.Game,
+            Member: member,
+            Key: instance,
+            Type: "CNAME",
+            Content: reason is null ? node!.Name : "",
+            State: reason is null ? NameState.Pending : NameState.Blocked,
+            RecordId: "",
+            Note: reason ?? "",
+            UpdatedAt: DateTimeOffset.UtcNow);
+    }
+
     /// <summary>Point an existing name at a freshly stated host.</summary>
     /// <remarks>
     /// A row already carrying that host is returned untouched, so a member stating the same host on

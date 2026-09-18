@@ -28,6 +28,34 @@ public sealed class MessageTests
     }
 
     [Fact]
+    public void A_game_server_list_round_trips_with_its_ports()
+    {
+        var sent = new DnsInstances([new DnsInstance("factorio-1", "factorio", [new DnsPort(34197, 34197, "udp")])]);
+
+        string json = JsonSerializer.Serialize(sent, DnsJsonContext.Default.DnsInstances);
+        using JsonDocument document = JsonDocument.Parse(json);
+        DnsInstances read = DnsJsonContext.Read(document.RootElement, DnsJsonContext.Default.DnsInstances)!;
+
+        Assert.Contains("\"instances\":[{\"instance\":\"factorio-1\"", json);
+        Assert.Equal(34197, read.Instances[0].Ports[0].Start);
+        Assert.Equal("udp", read.Instances[0].Ports[0].Protocol);
+    }
+
+    [Fact]
+    public void A_game_server_is_reached_at_its_name_only_once_published_and_is_never_served()
+    {
+        var book = new DnsNameBook();
+
+        book.Replace([new DnsNameEntry("factorio.play.example.com", "game", "factorio-1", "pending", "")]);
+        Assert.Null(book.GameName("factorio-1"));
+
+        book.Replace([new DnsNameEntry("factorio.play.example.com", "game", "factorio-1", "published", "")]);
+        Assert.Equal("factorio.play.example.com", book.GameName("factorio-1"));
+        Assert.Null(book.GameName("factorio-2"));
+        Assert.Empty(book.Published);
+    }
+
+    [Fact]
     public void Not_yet_told_and_told_nothing_are_different_answers()
     {
         // A member that has not heard from the anchor since it started keeps serving what it served; one

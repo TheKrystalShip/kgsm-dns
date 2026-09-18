@@ -66,4 +66,19 @@ public static class DnsMemberServiceCollectionExtensions
         services.AddHostedService<DnsSelfWorker>();
         return services;
     }
+
+    /// <summary>
+    /// Tell the DNS anchor which game servers this node has, so each is given a name under the play base.
+    /// </summary>
+    /// <remarks>
+    /// Only a node hosts game servers, so only a node registers this. Requires
+    /// <see cref="AddKgsmDnsMember"/>, and an <see cref="IDnsInstanceSource"/> reading the node's engine.
+    /// </remarks>
+    public static IServiceCollection AddKgsmDnsGameNames<TSource>(this IServiceCollection services)
+        where TSource : class, IDnsInstanceSource
+    {
+        services.AddSingleton<IDnsInstanceSource, TSource>();
+        services.AddHostedService<DnsInstancesWorker>();
+        return services;
+    }
 }

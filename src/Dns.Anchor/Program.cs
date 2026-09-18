@@ -88,6 +88,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterMembershipW
 // A node saying where it is reached. Registered as a handler on the cluster's inbox, which has already
 // checked that the sender is the member whose token signed the call.
 builder.Services.AddSingleton<IClusterMessageHandler, SelfHandler>();
+builder.Services.AddSingleton<IClusterMessageHandler, InstancesHandler>();
 
 // Certificates. One issuer account per holder, whose key this member generates and never sends
 // anywhere; challenges answered through the zone this member already holds the credential for; orders

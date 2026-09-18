@@ -89,8 +89,13 @@ internal sealed class ClusterMembershipWorker(
         // every tick because a capability can be reassigned and a holder's host can change, and writing
         // them once would leave whichever moved first behind. A tick that moved any of them brings the
         // zone pass forward, so a reassignment reaches the zone in seconds rather than an interval.
-        IReadOnlySet<string> touched =
-            await capabilities.SyncAsync(options.MemberId, options.PublicHost, ct).ConfigureAwait(false);
+        //
+        // Game names follow their node's own name the same way: a node whose name was drawn, blocked or
+        // published since its servers were named has them brought to match.
+        var touched = new HashSet<string>(
+            await capabilities.SyncAsync(options.MemberId, options.PublicHost, ct).ConfigureAwait(false),
+            StringComparer.Ordinal);
+        touched.UnionWith(names.RetargetGames());
         if (touched.Count > 0)
             RequestZonePass();
 

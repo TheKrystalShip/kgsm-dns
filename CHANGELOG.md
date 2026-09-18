@@ -5,6 +5,26 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+### Added — every game server has a name players connect through
+
+A node tells the anchor every game server installed on it (`dns.instances`), and the anchor names each
+`<game>.play.<zone>`, an alias of the node's own name, so a node's address change moves no game record.
+The label is the blueprint reduced to a label; a second server of the same game anywhere in the
+cluster takes the lowest free suffix (`factorio-2`), and a released label is free again.
+
+- **The set is the whole truth about one node.** It is sent only from a successful read of the engine,
+  so an instance missing from it has been uninstalled and loses its name; a failed read sends nothing
+  and releases nothing. A node's list touches that node's names only.
+- **A name is keyed on the node and the instance**, so restating keeps every name.
+- **A game name follows its node's own name**: blocked while the node has none or cannot be published,
+  and published once it can, re-derived on every tick.
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.5`**: the message shapes, `AddKgsmDnsGameNames<TSource>()` with
+  `IDnsInstanceSource` for a node to read its engine through, and `DnsNameBook.GameName(instance)`.
+  Level-triggered: the source is read every few seconds and the set sent when it changes, when the
+  holder of `dns` changes, and on a slow refresh.
+
 ## [0.5.0]
 
 ### Added — every capability the cluster assigns has a name that follows its holder

@@ -43,6 +43,15 @@ public sealed class DnsNameBook : Serving.IServedNames
     public string? NodeName =>
         _names.FirstOrDefault(n => n.Kind == NameKinds.Spell(NameKind.Member) && n.Published)?.Name;
 
+    /// <summary>
+    /// The name players reach one game server at, once the provider carries it; null otherwise.
+    /// </summary>
+    /// <param name="instance">The instance id.</param>
+    public string? GameName(string instance) =>
+        _names.FirstOrDefault(n => n.Kind == NameKinds.Spell(NameKind.Game)
+            && string.Equals(n.Key, instance, StringComparison.Ordinal)
+            && n.Published)?.Name;
+
     /// <summary>Replace everything with what the anchor just said.</summary>
     public void Replace(IReadOnlyList<DnsNameEntry> names)
     {
