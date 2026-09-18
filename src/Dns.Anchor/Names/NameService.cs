@@ -34,6 +34,11 @@ public sealed class NameService(
     MemberNamePool pool,
     ILogger<NameService> logger)
 {
+    // Claims arrive from the inbox and from the worker at once. A draw reads what is held and then
+    // writes, so two unserialized claims could each see a label free and the second would overwrite the
+    // first's row — two nodes on one name. Every claim and release holds this for its read and its write.
+    private readonly Lock _gate = new();
+
     /// <summary>
     /// The name a node is known by, drawn on first sight and kept from then on.
     /// </summary>
@@ -41,6 +46,12 @@ public sealed class NameService(
     /// <param name="publicHost">Where it is reached: a hostname, an address, or empty when unknown.</param>
     /// <returns>The row, whose state says whether it can be published.</returns>
     public NameRow ClaimMember(string member, string publicHost)
+    {
+        lock (_gate)
+            return ClaimMemberLocked(member, publicHost);
+    }
+
+    private NameRow ClaimMemberLocked(string member, string publicHost)
     {
         NameRow? existing = registry.FindFor(NameKind.Member, member, key: "");
         if (existing is not null)
@@ -78,6 +89,12 @@ public sealed class NameService(
     /// <param name="holder">The member the cluster assigns it to.</param>
     /// <param name="holderHost">Where that member is reached.</param>
     public NameRow ClaimCapability(string capability, string holder, string holderHost)
+    {
+        lock (_gate)
+            return ClaimCapabilityLocked(capability, holder, holderHost);
+    }
+
+    private NameRow ClaimCapabilityLocked(string capability, string holder, string holderHost)
     {
         string label = DnsLabel.Sanitize(capability);
         if (string.IsNullOrEmpty(label))
@@ -132,10 +149,14 @@ public sealed class NameService(
     /// </summary>
     public void Release(string name)
     {
-        if (registry.Find(name) is null)
-            return;
+        lock (_gate)
+        {
+            if (registry.Find(name) is null)
+                return;
 
-        registry.Remove(name);
+            registry.Remove(name);
+        }
+
         logger.LogInformation("released {Name}", name);
     }
 

@@ -21,9 +21,8 @@ Environment=Dns__ListenAddress=http://127.0.0.1:8099
 # proxy the daemon sees only the loopback hop — so it is stated, and it is what the roster carries.
 # Environment=Dns__PublicBaseUrl=https://dns.anchors.example
 
-# The zone, and the labels each kind of name lives under. Every name this anchor writes sits under one
-# of the three, so everything else in the zone is out of its reach.
-# Environment=Dns__Zone=example.com
+# The labels each kind of name lives under, inside the zone the settings file declares. Every name this
+# anchor writes sits under one of the three, so everything else in the zone is out of its reach.
 Environment=Dns__NodesBase=nodes
 Environment=Dns__AnchorsBase=anchors
 Environment=Dns__PlayBase=play
@@ -38,8 +37,8 @@ Environment=Dns__ClusterStorePath=/var/lib/kgsm-dns/cluster.db
 # misconfiguration.
 EnvironmentFile=-/etc/kgsm/kgsm-cluster.env
 
-# This anchor's own overrides, including the zone and the provider credential, which no default can
-# supply. Loaded last, so it wins over everything above.
+# This machine's own overrides: the provider credential, which no shipped file may carry, and where this
+# machine is reached. Loaded last, so it wins over everything above.
 EnvironmentFile=-/etc/kgsm-dns/kgsm-dns.env
 
 # The state directory, created and owned by systemd for the user above. It holds the registry, which

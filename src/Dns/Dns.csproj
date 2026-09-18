@@ -12,16 +12,30 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns</RootNamespace>
     <AssemblyName>TheKrystalShip.KGSM.Dns</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0-dev.1</Version>
 
     <PackageId>TheKrystalShip.KGSM.Dns</PackageId>
     <Authors>TheKrystalShip</Authors>
     <Description>
-      The names a KGSM cluster publishes: how a label is formed, which base it belongs under, and the
-      mark that says a record belongs to the cluster rather than to whoever else edits the zone.
+      The names a KGSM cluster publishes: how a label is formed, which base it belongs under, the mark
+      that says a record belongs to the cluster rather than to whoever else edits the zone, and the
+      node's half of the exchange — telling the DNS anchor where the node is reached, and keeping what
+      it answers.
     </Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The bus, the roster and the capability assignment a node's half of the exchange rides on.
+         Every consumer is already a cluster member, so this adds nothing a consumer does not carry. -->
+    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.18" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same advisory, same reasoning as every member's: a native SQLite library the cluster package
+         pulls in, where the flagged version is the latest published build. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="TheKrystalShip.KGSM.Dns.Tests" />

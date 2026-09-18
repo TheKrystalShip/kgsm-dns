@@ -5,6 +5,26 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0]
+
+### Added — nodes are named by the anchor they tell where they are reached
+
+A node states its public host on the bus (`dns.self`) and the anchor answers with every name it holds
+(`dns.names`). The anchor names a node from its list the first time it hears from it, publishes the
+name as an alias of the stated host, and tells the node again after the zone pass that published it.
+Only a node is named, read from the anchor's own roster rather than from the message, and a statement
+only ever moves the sender's own names. The host is trusted as stated: checking it against the address
+the node calls from would refuse correct configurations on dual-stack and multi-link networks.
+
+- **`TheKrystalShip.KGSM.Dns 0.2.0-dev.1`** carries the two messages and the node's half,
+  `AddKgsmDnsMember`: the statement, repeated on startup, on a change of holder or host, and on a slow
+  refresh, and the book of names the anchor answered with — accepted only from the member holding
+  `dns`.
+- **Claims are serialized.** The inbox and the zone worker claim at once, and a draw that read and wrote
+  unguarded could give two nodes one name.
+- **The cluster's values ship in the settings file**: the zone, its id, the name list and the pins. The
+  env file carries the provider token and where the anchor's own machine is reached.
+
 ## [0.2.0]
 
 ### Changed — names point at dynamic-DNS hosts, and only nodes hold node names

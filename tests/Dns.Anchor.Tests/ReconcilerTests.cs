@@ -279,6 +279,26 @@ public sealed class ReconcilerTests : IDisposable
     }
 
     [Fact]
+    public void Nodes_claiming_at_once_never_share_a_name()
+    {
+        // Claims arrive from the inbox and the worker concurrently. A draw that read and wrote without
+        // holding anything would let two of them see one label free, and the second would overwrite the
+        // first's row.
+        var names = new NameService(
+            _registry,
+            Bases,
+            new MemberNamePool(["walter", "skyler", "hank", "marie", "saul", "gustavo", "mike", "tuco"],
+                new Dictionary<string, string>()),
+            NullLogger<NameService>.Instance);
+
+        NameRow[] claimed = new NameRow[8];
+        Parallel.For(0, claimed.Length, i => claimed[i] = names.ClaimMember("node-" + i, "home.ddns.net"));
+
+        Assert.Equal(claimed.Length, claimed.Select(r => r.Name).Distinct().Count());
+        Assert.Equal(claimed.Length, _registry.OfKind(NameKind.Member).Count);
+    }
+
+    [Fact]
     public void A_name_pinned_to_another_member_is_never_drawn()
     {
         // The first node to join must not draw the name somebody else is already promised.

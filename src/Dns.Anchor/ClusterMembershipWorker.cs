@@ -32,11 +32,19 @@ internal sealed class ClusterMembershipWorker(
     ClusterStateStore state,
     NameService names,
     RecordReconciler reconciler,
+    SqliteNameRegistry registry,
+    NamesAnnouncer announcer,
     ILogger<ClusterMembershipWorker> logger)
     : ClusterCapabilityWorker(DnsCapability.Name, cluster, state, logger)
 {
     private DateTimeOffset _nextZonePass = DateTimeOffset.MinValue;
     private bool _saidUnconfigured;
+
+    /// <summary>
+    /// Bring the next zone pass forward to the next tick, for a claim that should not wait out the
+    /// whole interval — a node that has just said where it is reached.
+    /// </summary>
+    public void RequestZonePass() => _nextZonePass = DateTimeOffset.MinValue;
 
     protected override async Task OnStandingAsync(
         CapabilityHolding holding, bool changed, CancellationToken ct)
@@ -107,6 +115,19 @@ internal sealed class ClusterMembershipWorker(
                 logger.LogInformation(
                     "zone pass: {Published} published, {Moved} moved, {Removed} withdrawn, {Recovered} recovered",
                     pass.Published, pass.Moved, pass.Removed, pass.Recovered);
+            }
+
+            // A pass that changed where any name stands is followed by telling each member holding one,
+            // so a node learns it is published once it is, rather than on its next statement.
+            if (!pass.Quiet || pass.Contested > 0)
+            {
+                foreach (string member in registry.All()
+                             .Select(r => r.Member)
+                             .Where(m => !string.Equals(m, options.MemberId, StringComparison.Ordinal))
+                             .Distinct(StringComparer.Ordinal))
+                {
+                    await announcer.AnnounceAsync(member, ct).ConfigureAwait(false);
+                }
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

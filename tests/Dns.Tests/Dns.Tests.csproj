@@ -28,6 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Same advisory, same reasoning as the package under test. A suppression does not flow across a
+         project reference, so the consumer declares it too. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

@@ -94,7 +94,7 @@
       "description": "The domain this cluster publishes names in, such as example.com. One domain is all a cluster needs: members, capabilities and game servers are named underneath it.",
       "group": "naming",
       "type": "string",
-      "default": "",
+      "default": "thekrystalship.com",
       "risk": "destructive"
     },
     {
@@ -134,7 +134,7 @@
       "description": "The names members are given when they join, one of which is drawn at random for each. Nothing on a machine has to be configured with what that machine is called.",
       "group": "naming",
       "type": "csv",
-      "default": "",
+      "default": "walter,skyler,hank,marie,saul,gustavo,mike,tuco,hector,gale,lydia,todd,huell,kim,nacho,lalo,howard,badger,skinny,krazy8",
       "risk": "safe"
     },
     {
@@ -144,7 +144,7 @@
       "description": "Members that keep a name they already answer to, written as member=name. A machine people already reach at a name goes on being reached there when it joins.",
       "group": "naming",
       "type": "csv",
-      "default": "",
+      "default": "hotrod=walter,jessie=jessie",
       "risk": "wiring"
     },
     {
@@ -167,7 +167,7 @@
       "description": "The provider's identifier for the zone. Its dashboard shows it beside the domain.",
       "group": "provider",
       "type": "string",
-      "default": "",
+      "default": "3a0f8ef1ba56fa2e558837734cb80ecc",
       "risk": "wiring"
     },
     {

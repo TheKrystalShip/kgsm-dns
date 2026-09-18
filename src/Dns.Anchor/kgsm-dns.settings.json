@@ -33,22 +33,22 @@
     // The zone every name lives in, and the three labels they live under. A cluster needs one domain:
     // members, capabilities and game servers are named beneath it, and the separate bases are what
     // make "is this record the cluster's?" a test rather than a judgement.
-    "Zone": "",
+    "Zone": "thekrystalship.com",
     "NodesBase": "nodes",
     "AnchorsBase": "anchors",
     "PlayBase": "play",
 
-    // The names members are given when they join, one drawn at random for each, and the members that
-    // keep a name they already answer to, written as member=name.
-    "MemberNames": "",
-    "MemberNamePins": "",
+    // The names nodes are given when they join, one drawn at random for each, and the nodes that keep a
+    // name they are promised, written as member=name. A pinned name is never drawn for anyone else.
+    "MemberNames": "walter,skyler,hank,marie,saul,gustavo,mike,tuco,hector,gale,lydia,todd,huell,kim,nacho,lalo,howard,badger,skinny,krazy8",
+    "MemberNamePins": "hotrod=walter,jessie=jessie",
 
     // The zone's provider, its id for the zone, and the credential. The token is the reason one member
     // holds this capability and every other member asks it for a name: a provider token scopes to a
     // zone and not to a part of one, so a copy on every machine would be a copy of the whole zone.
-    // Declared blank here — the value lives in the root-owned env file.
+    // Declared blank here — the value lives in the root-owned env file. The zone id is not a secret.
     "Provider": "cloudflare",
-    "ProviderZoneId": "",
+    "ProviderZoneId": "3a0f8ef1ba56fa2e558837734cb80ecc",
     "ProviderToken": "",
 
     // How long other computers may remember an answer, and how often the zone is compared with what

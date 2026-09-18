@@ -1,5 +1,6 @@
 using TheKrystalShip.KGSM.Cluster;
 using TheKrystalShip.KGSM.Cluster.Membership;
+using TheKrystalShip.KGSM.Cluster.Messaging;
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
@@ -72,7 +73,16 @@ builder.Services.AddSingleton(sp => new RecordReconciler(
     options.Ttl,
     sp.GetRequiredService<ILogger<RecordReconciler>>()));
 
-builder.Services.AddHostedService<ClusterMembershipWorker>();
+builder.Services.AddSingleton<NamesAnnouncer>();
+
+// The worker is a singleton as well as a hosted service, so the handler below can bring its next zone
+// pass forward when a node says where it is reached.
+builder.Services.AddSingleton<ClusterMembershipWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterMembershipWorker>());
+
+// A node saying where it is reached. Registered as a handler on the cluster's inbox, which has already
+// checked that the sender is the member whose token signed the call.
+builder.Services.AddSingleton<IClusterMessageHandler, SelfHandler>();
 
 WebApplication app = builder.Build();
 
