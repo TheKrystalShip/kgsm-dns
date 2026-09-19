@@ -50,7 +50,7 @@ internal sealed class CsrHandler(
         if (row is null
             || !string.Equals(row.Member, envelope.From, StringComparison.Ordinal)
             || row.State != NameState.Published
-            || row.Kind == NameKind.Game)
+            || !NameKinds.TakesCertificate(row.Kind))
         {
             logger.LogWarning(
                 "{From} asked for a certificate for {Name}, which it does not hold published — refused",

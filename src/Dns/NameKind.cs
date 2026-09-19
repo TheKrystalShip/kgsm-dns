@@ -17,6 +17,12 @@ public enum NameKind
 
     /// <summary>A game server, played at directly. Under the play base.</summary>
     Game,
+
+    /// <summary>
+    /// An admin-chosen additional name for an existing game server, under the play base beside it. It
+    /// follows the same node the game name does and is played at directly the same way.
+    /// </summary>
+    Alias,
 }
 
 /// <summary>The wire spelling of a <see cref="NameKind"/>, used in a record's mark.</summary>
@@ -28,6 +34,7 @@ public static class NameKinds
         NameKind.Member => "member",
         NameKind.Capability => "capability",
         NameKind.Game => "game",
+        NameKind.Alias => "alias",
         _ => "member",
     };
 
@@ -37,6 +44,13 @@ public static class NameKinds
         "member" => NameKind.Member,
         "capability" => NameKind.Capability,
         "game" => NameKind.Game,
+        "alias" => NameKind.Alias,
         _ => null,
     };
+
+    /// <summary>
+    /// Whether a name of this kind is ever entitled to a certificate. A game name and its aliases are
+    /// played at directly and never served over HTTPS by their node, so neither is ever entitled to one.
+    /// </summary>
+    public static bool TakesCertificate(NameKind kind) => kind is NameKind.Member or NameKind.Capability;
 }

@@ -72,7 +72,12 @@ public sealed class ClusterBasesTests
         Assert.Equal("jessie.nodes.example.com", Bases.Compose(NameKind.Member, "jessie"));
         Assert.Equal("auth.anchors.example.com", Bases.Compose(NameKind.Capability, "auth"));
         Assert.Equal("minecraft.play.example.com", Bases.Compose(NameKind.Game, "minecraft"));
+        Assert.Equal("smp.play.example.com", Bases.Compose(NameKind.Alias, "smp"));
     }
+
+    [Fact]
+    public void An_alias_lives_in_the_play_base_beside_the_games() =>
+        Assert.True(Bases.Owns(Bases.Compose(NameKind.Alias, "smp")));
 
     [Fact]
     public void A_name_outside_every_base_is_not_the_clusters()
@@ -102,12 +107,37 @@ public sealed class ClusterBasesTests
         Assert.Equal("jessie", Bases.LabelOf(NameKind.Member, "jessie.nodes.example.com"));
 }
 
+public sealed class NameKindsTests
+{
+    [Theory]
+    [InlineData(NameKind.Member, true)]
+    [InlineData(NameKind.Capability, true)]
+    [InlineData(NameKind.Game, false)]
+    [InlineData(NameKind.Alias, false)]
+    public void Only_a_member_or_a_capability_name_ever_takes_a_certificate(NameKind kind, bool takes) =>
+        Assert.Equal(takes, NameKinds.TakesCertificate(kind));
+
+    [Fact]
+    public void Alias_spells_and_parses_back() =>
+        Assert.Equal(NameKind.Alias, NameKinds.Parse(NameKinds.Spell(NameKind.Alias)));
+}
+
 public sealed class RecordMarkTests
 {
     [Fact]
     public void A_mark_round_trips()
     {
         var mark = new RecordMark(NameKind.Game, "jessie", "factorio-01");
+
+        RecordMark? read = RecordMark.Parse(mark.ToString());
+
+        Assert.Equal(mark, read);
+    }
+
+    [Fact]
+    public void An_alias_mark_round_trips()
+    {
+        var mark = new RecordMark(NameKind.Alias, "jessie", "factorio-01");
 
         RecordMark? read = RecordMark.Parse(mark.ToString());
 

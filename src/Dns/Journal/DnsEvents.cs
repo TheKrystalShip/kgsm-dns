@@ -47,6 +47,18 @@ public static class DnsEvents
 
     /// <summary>A pass completed again, after one that could not.</summary>
     public const string ZoneRestored = "dns.zone.restored";
+
+    /// <summary>An admin asked for a zone pass sooner than the timer would run one.</summary>
+    public const string ZoneCheckRequested = "dns.zone.check_requested";
+
+    /// <summary>An admin asked for a certificate to be renewed now, ahead of its own schedule.</summary>
+    public const string CertificateRenewRequested = "dns.certificate.renew_requested";
+
+    /// <summary>An admin named an existing game server under an additional label.</summary>
+    public const string AliasAdded = "dns.alias.added";
+
+    /// <summary>An admin gave up an alias.</summary>
+    public const string AliasRemoved = "dns.alias.removed";
 }
 
 /// <summary>
@@ -112,6 +124,26 @@ public static class DnsEventPayloads
     /// <param name="error">What the provider answered when it stopped, or null when it came back.</param>
     public static Action<Utf8JsonWriter> Zone(string? error) =>
         w => Nullable(w, "Error", error);
+
+    /// <summary>A certificate asked for out of its own schedule.</summary>
+    /// <param name="name">The name it is for.</param>
+    /// <param name="member">The member it was asked for.</param>
+    public static Action<Utf8JsonWriter> CertificateRequested(string name, string member) =>
+        w =>
+        {
+            w.WriteString("Name", name);
+            w.WriteString("Member", member);
+        };
+
+    /// <summary>An alias and the game server it names.</summary>
+    /// <param name="name">The alias's own fully qualified name.</param>
+    /// <param name="server">The game name it points at.</param>
+    public static Action<Utf8JsonWriter> Alias(string name, string server) =>
+        w =>
+        {
+            w.WriteString("Name", name);
+            w.WriteString("Server", server);
+        };
 
     private static void Identity(Utf8JsonWriter w, string name, string kind, string member, string key)
     {

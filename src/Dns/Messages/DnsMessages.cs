@@ -44,6 +44,12 @@ public static class DnsMessageTypes
     /// successful read, so an instance missing from it has been uninstalled and its name is released.
     /// </summary>
     public const string Instances = "dns.instances";
+
+    /// <summary>
+    /// The DNS anchor to a member: ask for a certificate now, ahead of its own schedule. An admin action,
+    /// not a fact about the name — the member decides for itself whether to act on it.
+    /// </summary>
+    public const string Renew = "dns.renew";
 }
 
 /// <summary>One port range a game server listens on.</summary>
@@ -71,6 +77,10 @@ public sealed record DnsCsr(string Name, string Csr);
 /// <param name="Name">The name it is for.</param>
 /// <param name="Chain">The PEM chain, leaf first.</param>
 public sealed record DnsCert(string Name, string Chain);
+
+/// <summary>Ask a member for a certificate for one of its names, ahead of its own schedule.</summary>
+/// <param name="Name">The name to renew. The member ignores this for any name it does not hold.</param>
+public sealed record DnsRenew(string Name);
 
 /// <summary>What a member says about itself.</summary>
 /// <param name="PublicHost">
@@ -126,6 +136,7 @@ public sealed record DnsNames(IReadOnlyList<DnsNameEntry> Names);
 [JsonSerializable(typeof(DnsNameEntry))]
 [JsonSerializable(typeof(DnsCsr))]
 [JsonSerializable(typeof(DnsCert))]
+[JsonSerializable(typeof(DnsRenew))]
 [JsonSerializable(typeof(DnsInstances))]
 [JsonSerializable(typeof(DnsCollision))]
 public sealed partial class DnsJsonContext : JsonSerializerContext

@@ -23,4 +23,21 @@ public sealed class NameBookTests
         // A certificate is asked for only once the name resolves: the anchor refuses one before that.
         Assert.Empty(book.Published);
     }
+
+    [Fact]
+    public void An_alias_entry_is_carried_but_never_served_or_certified()
+    {
+        // A member serves its own node and capability names; a game name and its aliases are played at
+        // directly. An alias arriving here is a kind this member's Published/Held never single out, so it
+        // sits in All and nowhere else — safely ignored rather than crashing on a kind it does not know.
+        var book = new DnsNameBook();
+        book.Replace([
+            new DnsNameEntry("jessie.nodes.example.com", NameKinds.Spell(NameKind.Member), "", "published", ""),
+            new DnsNameEntry("smp.play.example.com", NameKinds.Spell(NameKind.Alias), "ark-1", "published", ""),
+        ]);
+
+        Assert.Equal(["jessie.nodes.example.com"], book.Held);
+        Assert.Equal(["jessie.nodes.example.com"], book.Published);
+        Assert.Equal(2, book.All.Count);
+    }
 }

@@ -63,61 +63,80 @@ internal sealed class ClusterBearer(
     /// <summary>The least a person must hold to read this anchor's pages.</summary>
     public const KgsmTier Minimum = KgsmTier.Viewer;
 
+    /// <summary>The least a person must hold to change anything through this anchor.</summary>
+    public const KgsmTier AdminMinimum = KgsmTier.Admin;
+
     /// <summary>
-    /// Admit the request, or answer it with why not.
+    /// Admit the request to a read, or answer it with why not.
     /// </summary>
     /// <returns>Null when the caller is admitted; otherwise the result to send back.</returns>
-    public async Task<IResult?> RefuseAsync(HttpRequest request, CancellationToken ct)
+    public async Task<IResult?> RefuseAsync(HttpRequest request, CancellationToken ct) =>
+        (await AuthorizeAsync(request, Minimum, ct).ConfigureAwait(false)).Refusal;
+
+    /// <summary>
+    /// Admit the request to a route requiring at least <paramref name="minimum"/>, or answer it with why
+    /// not.
+    /// </summary>
+    /// <returns>
+    /// A null <see cref="Admission.Refusal"/> and the caller's identity when admitted; otherwise the
+    /// result to send back and no identity.
+    /// </returns>
+    public async Task<Admission> AuthorizeAsync(HttpRequest request, KgsmTier minimum, CancellationToken ct)
     {
         string header = request.Headers.Authorization.ToString();
         string? token = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
             ? header["Bearer ".Length..].Trim()
             : null;
         if (string.IsNullOrEmpty(token))
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
         if (keys.Audience is null || keys.Issuer is null || keys.Keys.Count == 0)
         {
-            return Unavailable(
+            return new Admission(Unavailable(
                 "this anchor has not yet heard which member holds the cluster's accounts, so it cannot "
-                + "verify a session");
+                + "verify a session"), null);
         }
 
         TokenValidationResult result = await Handler
             .ValidateTokenAsync(token, ClusterSessionValidation.Accepting(_ownHalf, keys))
             .ConfigureAwait(false);
         if (!result.IsValid || result.ClaimsIdentity is not ClaimsIdentity claims)
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
         // A refresh token lives far longer than an access token, and accepting one as a bearer would erase
         // the short lifetime that bounds what a stolen bearer is worth.
         if (claims.FindFirst(KgsmAuthClaims.TokenKind)?.Value != KgsmTokenKind.Access)
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
         KgsmIdentity? identity = SessionClaims.ReadIdentity(claims);
         string? sessionId = SessionClaims.ReadSessionId(claims);
         if (identity is null || sessionId is null)
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
         if (await revocations.IsRevokedAsync(sessionId, ct).ConfigureAwait(false))
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
         AuthorityAnswer? answer = await accounts.ResolveAsync(identity, ct).ConfigureAwait(false);
         if (answer is not { } authority)
         {
-            return Unavailable(accounts.UnavailableReason
-                ?? "this anchor has no copy of the cluster's accounts yet, so nobody can be identified here");
+            return new Admission(Unavailable(accounts.UnavailableReason
+                ?? "this anchor has no copy of the cluster's accounts yet, so nobody can be identified here"), null);
         }
 
         // A switched-off account is a door closing: the session ends here as it does on every member.
         if (authority.Outcome == AuthorityOutcome.Disabled)
-            return Results.Unauthorized();
+            return new Admission(Results.Unauthorized(), null);
 
-        if (authority.Outcome != AuthorityOutcome.Ok || authority.Tier < Minimum)
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        if (authority.Outcome != AuthorityOutcome.Ok || authority.Tier < minimum)
+            return new Admission(Results.StatusCode(StatusCodes.Status403Forbidden), null);
 
-        return null;
+        return new Admission(null, identity);
     }
+
+    /// <summary>What a request resolved to: a refusal to send back, or who is asking.</summary>
+    /// <param name="Refusal">The result to send back, or null when the caller is admitted.</param>
+    /// <param name="Identity">The caller's identity, present exactly when <paramref name="Refusal"/> is null.</param>
+    public readonly record struct Admission(IResult? Refusal, KgsmIdentity? Identity);
 
     private static IResult Unavailable(string reason) =>
         Results.Json(

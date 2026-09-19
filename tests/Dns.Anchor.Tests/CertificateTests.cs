@@ -197,6 +197,26 @@ public sealed class CertificateFilesTests : IDisposable
         Assert.True(new HeldCertificate("walter.nodes.example.com", null, null, "").Due(DateTimeOffset.UtcNow));
 
     [Fact]
+    public void RenewsFrom_is_the_start_of_the_last_third_of_the_lifetime()
+    {
+        DateTimeOffset from = DateTimeOffset.UtcNow;
+        DateTimeOffset until = from.AddDays(90);
+
+        Assert.Equal(from.AddDays(60), HeldCertificate.RenewsFrom(from, until));
+    }
+
+    [Fact]
+    public void Due_and_RenewsFrom_agree_on_the_same_certificate()
+    {
+        DateTimeOffset from = DateTimeOffset.UtcNow.AddDays(-61);
+        DateTimeOffset until = from.AddDays(90);
+        var held = new HeldCertificate("walter.nodes.example.com", from, until, "AB");
+
+        Assert.True(held.Due(DateTimeOffset.UtcNow));
+        Assert.True(DateTimeOffset.UtcNow >= HeldCertificate.RenewsFrom(from, until));
+    }
+
+    [Fact]
     public void The_generated_site_names_only_certificate_paths_and_the_components_own_rules()
     {
         var files = new CertificateFiles(_root);

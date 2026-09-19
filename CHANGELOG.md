@@ -5,6 +5,37 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0]
+
+### Added — an admin can act on what the anchor holds
+
+- **`POST /api/v1/cluster/dns/zone/check`** brings the next zone pass forward to now, rather than waiting
+  out the reconcile interval.
+- **`POST /api/v1/cluster/dns/certificates/{name}/renew`** asks for a certificate to be renewed ahead of
+  its own schedule: this anchor's own `CertificateKeeper` is woken directly for one of its own names,
+  and a `dns.renew` bus message is queued for any other member's. `404` for an unknown name, `409` for a
+  name that takes no certificate (a game name or an alias) or is not yet published.
+- **`POST /api/v1/cluster/dns/aliases`** (`{ "server", "label" }`) and
+  **`DELETE /api/v1/cluster/dns/aliases/{name}`** name an existing, published game server under an
+  additional label in the play base — the same entitlement a game name has, following the same node and
+  released with it. A new `NameKind.Alias`, its own mark, and `DnsNameStatus.AliasOf` naming the server
+  an alias follows.
+- **Every write needs admin**, checked by `ClusterBearer.AuthorizeAsync` against this anchor's own copy
+  of the accounts; the reads stay open to a viewer. A member standing by for the capability, or one with
+  no zone and credential configured, refuses every write with a body naming why rather than touching the
+  registry, the zone or a member. CORS now admits `POST` and `DELETE` and a `Content-Type` header.
+- **New journal events**: `dns.zone.check_requested`, `dns.certificate.renew_requested`,
+  `dns.alias.added`, `dns.alias.removed` — each recorded with the acting person as `provider:username`.
+- **`DnsCertificateOrder.RenewsFrom`** names when a member will next ask for a certificate — the start of
+  its last third, the same fraction `HeldCertificate.Due` renews on, computed once in
+  `HeldCertificate.RenewsFrom` and read by both. `DnsCertificatesStatus.FailedLastWeek` counts orders that
+  ended without a certificate in the last seven days. A certificate's `NotBefore` is now recorded at
+  issuance, in a `not_before` column added to `certificate_orders` on an existing store; an order from
+  before this version reports `RenewsFrom` null rather than guessing.
+- `TheKrystalShip.KGSM.Dns 0.2.0-dev.12`: `NameKind.Alias`, `NameKinds.TakesCertificate`,
+  `HeldCertificate.RenewsFrom`, `DnsMessageTypes.Renew` / `DnsRenew`, the new `DnsStatusRoutes` and
+  `DnsAliasRequest`, and the new `DnsEvents` / `DnsEventPayloads`.
+
 ## [0.10.0]
 
 ### Added — a person can read what the anchor holds

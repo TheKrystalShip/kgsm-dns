@@ -175,11 +175,12 @@ builder.Services.AddSingleton<IClusterMessageHandler>(sp => new SessionRevokeHan
 
 builder.Services.AddSingleton<ClusterBearer>();
 
-// The Control Panel is served from another origin. Reads only, with a bearer and never a cookie.
+// The Control Panel is served from another origin, with a bearer and never a cookie. The writes below
+// need POST and DELETE and a JSON body.
 builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
     .WithOrigins([.. options.AllowedOrigins])
-    .WithMethods("GET")
-    .WithHeaders("Authorization")));
+    .WithMethods("GET", "POST", "DELETE")
+    .WithHeaders("Authorization", "Content-Type")));
 
 WebApplication app = builder.Build();
 
@@ -194,6 +195,10 @@ app.MapGet(NamesEndpoint.Path, NamesEndpoint.HandleAsync);
 
 // What a person's browser reads: the cluster's names as this anchor holds them, and its journal.
 StatusEndpoints.Map(app);
+
+// What an admin's browser writes: a zone check, a certificate renewal, and a game server's aliases.
+// Admin tier only, and only on the holder — see AdminEndpoints's own remarks.
+AdminEndpoints.Map(app);
 
 // What this anchor is. Serialized through the source-generated context, because a Native AOT build has
 // no reflection to fall back on.

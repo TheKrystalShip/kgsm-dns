@@ -35,6 +35,9 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
     /// </summary>
     internal const string ProducerId = "kgsm-dns";
 
+    /// <summary>The surface an admin action came through.</summary>
+    internal const string OriginUi = "ui";
+
     /// <summary>Record every change one zone pass made.</summary>
     public async Task PassAsync(RecordReconciler.Pass pass, CancellationToken ct)
     {
@@ -64,6 +67,23 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
         WriteAsync(DnsEvents.CertificateRefused, DnsEventPayloads.Certificate(name, member, null, reason), ct,
             actor: "member:" + member);
 
+    /// <summary>Record an admin asking for a zone pass sooner than the timer would run one.</summary>
+    public Task ZoneCheckRequestedAsync(string actor, CancellationToken ct) =>
+        WriteAsync(DnsEvents.ZoneCheckRequested, _ => { }, ct, actor, OriginUi);
+
+    /// <summary>Record an admin asking for a certificate to be renewed now, ahead of its own schedule.</summary>
+    public Task RenewRequestedAsync(string name, string member, string actor, CancellationToken ct) =>
+        WriteAsync(DnsEvents.CertificateRenewRequested, DnsEventPayloads.CertificateRequested(name, member), ct,
+            actor, OriginUi);
+
+    /// <summary>Record an admin naming an existing game server under an additional label.</summary>
+    public Task AliasAddedAsync(string name, string server, string actor, CancellationToken ct) =>
+        WriteAsync(DnsEvents.AliasAdded, DnsEventPayloads.Alias(name, server), ct, actor, OriginUi);
+
+    /// <summary>Record an admin giving up an alias.</summary>
+    public Task AliasRemovedAsync(string name, string server, string actor, CancellationToken ct) =>
+        WriteAsync(DnsEvents.AliasRemoved, DnsEventPayloads.Alias(name, server), ct, actor, OriginUi);
+
     private Task ChangeAsync(ZoneChange change, CancellationToken ct)
     {
         string kind = NameKinds.Spell(change.NameKind);
@@ -83,6 +103,7 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
         };
     }
 
-    private Task WriteAsync(string type, Action<Utf8JsonWriter> payload, CancellationToken ct, string? actor = null) =>
-        RecordAsync(EventName.Parse(type), payload, actor, ct: ct);
+    private Task WriteAsync(
+        string type, Action<Utf8JsonWriter> payload, CancellationToken ct, string? actor = null, string? origin = null) =>
+        RecordAsync(EventName.Parse(type), payload, actor, origin, ct: ct);
 }

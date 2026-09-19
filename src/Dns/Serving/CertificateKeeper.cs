@@ -70,6 +70,25 @@ public sealed class CertificateKeeper(
             _wake.Release();
     }
 
+    /// <summary>
+    /// Ask for a certificate for one published name right now, whether or not it is due.
+    /// </summary>
+    /// <remarks>
+    /// An admin asking for a renewal means now, not "the next time the fraction of lifetime left says so"
+    /// — the one case <see cref="PassAsync"/> itself never takes.
+    /// </remarks>
+    /// <returns>Whether the name is one this member serves, so a request was made.</returns>
+    public async Task<bool> ForceAsync(string name, CancellationToken ct)
+    {
+        if (!files.Usable || !names.Published.Contains(name, StringComparer.Ordinal))
+            return false;
+
+        _asked[name] = DateTimeOffset.UtcNow;
+        await requester.RequestAsync(name, files.SigningRequest(name), ct).ConfigureAwait(false);
+        logger.LogInformation("asked for a certificate for {Name}", name);
+        return true;
+    }
+
     /// <summary>Keep a chain the anchor issued, and serve it.</summary>
     public void Receive(string name, string chainPem)
     {

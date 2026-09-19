@@ -78,27 +78,42 @@ Certificates are renewed in the last third of their lifetime.
 ## What a person can read
 
 The anchor answers a browser directly, so a cluster's names have a page whether or not any node runs
-a Control Panel API. Both routes are reads; nothing a browser sends reaches the zone.
+a Control Panel API. Nothing a browser sends here reaches the zone directly — every write below goes
+through the same entitlement checks the zone pass itself runs under.
 
 | route | answers |
 |---|---|
-| `GET /api/v1/cluster/dns` | the whole picture as one `DnsStatus`: this member's standing (holder or standing by, configured, zone, bases, cadence, issuer), the zone's health (last pass, its duration, error and what it changed, next pass, contested names), every name with its target, state, block reason, declared ports and cross-member port collisions, every member with where it said it is reached, when, and what that resolved to, and every certificate order with its expiry and the count issued in the last week |
+| `GET /api/v1/cluster/dns` | the whole picture as one `DnsStatus`: this member's standing (holder or standing by, configured, zone, bases, cadence, issuer), the zone's health (last pass, its duration, error and what it changed, next pass, contested names), every name with its target, state, block reason, declared ports, cross-member port collisions and — for an alias — the game name it follows, every member with where it said it is reached, when, and what that resolved to, and every certificate order with its expiry, when it will next be renewed, and the counts issued and failed in the last week |
 | `GET /api/v1/cluster/dns/events?limit=` | the newest lines of the anchor's own event journal, newest first, as the journal holds them |
 
 A caller presents the session the cluster's auth anchor minted. It verifies here against the key that
 member publishes through gossip, and the person's authority is read on every request from the anchor's
-own copy of the cluster's accounts — a viewer or above is admitted, a disabled account is signed out, and
-a session ended elsewhere is refused from the moment the announcement arrives. An anchor that has not yet
-heard the key, or has no copy of the accounts yet, answers `503` naming the reason rather than `401`.
-The Control Panel's origin is listed in `AllowedOrigins`.
+own copy of the cluster's accounts — a viewer or above is admitted to the reads above, a disabled account
+is signed out, and a session ended elsewhere is refused from the moment the announcement arrives. An
+anchor that has not yet heard the key, or has no copy of the accounts yet, answers `503` naming the
+reason rather than `401`. The Control Panel's origin is listed in `AllowedOrigins`.
 
 Unknown is never reported as none. A pass that has not run, a host that did not resolve, a collision
 that could not be checked and a certificate issued before anything recorded it are all null.
 
+## What an admin can write
+
+Every route below needs admin, the same accounts copy checked on every read, and refuses with a body
+naming why on a member standing by for the capability or one with no zone and credential configured —
+such a member writes nothing, the same as the zone pass itself.
+
+| route | does |
+|---|---|
+| `POST /api/v1/cluster/dns/zone/check` | brings the next zone pass forward to now |
+| `POST /api/v1/cluster/dns/certificates/{name}/renew` | asks for that name's certificate to be renewed ahead of its own schedule — `404` for a name this anchor does not hold, `409` for one that takes no certificate (a game name or an alias) or is not yet published |
+| `POST /api/v1/cluster/dns/aliases` (`{ "server", "label" }`) | names an existing, published game server under an additional label in the play base — the same entitlement its game name has, following the same node and released with it — `409` when the name is already held |
+| `DELETE /api/v1/cluster/dns/aliases/{name}` | gives up an alias; its server keeps its own name and every other alias |
+
 **The journal** is `/var/lib/kgsm-dns/events/`, in the ecosystem's envelope, and records transitions:
 `dns.name.published`, `.moved`, `.withdrawn`, `.contested`, `.recovered`; `dns.certificate.issued`,
-`.failed`, `.refused`; `dns.zone.unreachable` and `.restored`. A quiet pass writes nothing. Names and
-payloads are the package's (`DnsEvents`, `DnsEventPayloads`).
+`.failed`, `.refused`, `.renew_requested`; `dns.zone.unreachable`, `.restored` and `.check_requested`;
+`dns.alias.added` and `.removed`. A quiet pass writes nothing. Names and payloads are the package's
+(`DnsEvents`, `DnsEventPayloads`); an admin action's actor is the person, `provider:username`.
 
 ## Packages
 

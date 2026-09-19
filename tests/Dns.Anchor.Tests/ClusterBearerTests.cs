@@ -129,6 +129,31 @@ public sealed class ClusterBearerTests : IDisposable
         Assert.Equal(StatusCodes.Status401Unauthorized, await StatusOfAsync(token: null));
     }
 
+    [Fact]
+    public async Task A_viewer_is_refused_a_route_that_needs_admin()
+    {
+        await AccountAsync(KgsmTier.Viewer, UserStatus.Active);
+
+        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(tier: "viewer"), KgsmTier.Admin);
+
+        Assert.NotNull(admission.Refusal);
+        Assert.Null(admission.Identity);
+        Assert.Equal(StatusCodes.Status403Forbidden,
+            Assert.IsAssignableFrom<IStatusCodeHttpResult>(admission.Refusal).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_admin_is_admitted_to_a_route_that_needs_admin_and_is_identified()
+    {
+        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
+
+        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(tier: "admin"), KgsmTier.Admin);
+
+        Assert.Null(admission.Refusal);
+        Assert.NotNull(admission.Identity);
+        Assert.Equal("local:probe", admission.Identity!.ActorString);
+    }
+
     public void Dispose()
     {
         _signing.Dispose();
@@ -178,6 +203,14 @@ public sealed class ClusterBearerTests : IDisposable
         if (token is not null)
             context.Request.Headers.Authorization = "Bearer " + token;
         return _bearer.RefuseAsync(context.Request, CancellationToken.None);
+    }
+
+    private Task<ClusterBearer.Admission> AuthorizeAsync(string? token, KgsmTier minimum)
+    {
+        var context = new DefaultHttpContext();
+        if (token is not null)
+            context.Request.Headers.Authorization = "Bearer " + token;
+        return _bearer.AuthorizeAsync(context.Request, minimum, CancellationToken.None);
     }
 
     private async Task<int?> StatusOfAsync(string? token) =>

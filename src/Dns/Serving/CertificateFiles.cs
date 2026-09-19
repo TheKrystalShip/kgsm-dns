@@ -21,14 +21,18 @@ public sealed record HeldCertificate(string Name, DateTimeOffset? NotBefore, Dat
     /// A fraction rather than a number of days, because issuers shorten lifetimes and a fraction needs
     /// nothing revisited when they do.
     /// </remarks>
-    public bool Due(DateTimeOffset now)
-    {
-        if (NotBefore is not { } from || NotAfter is not { } until)
-            return true;
+    public bool Due(DateTimeOffset now) =>
+        NotBefore is not { } from || NotAfter is not { } until || now >= RenewsFrom(from, until);
 
-        TimeSpan lifetime = until - from;
-        return now >= until - lifetime / 3;
-    }
+    /// <summary>
+    /// The moment a certificate with this lifetime falls due for renewal: the start of its last third.
+    /// </summary>
+    /// <remarks>
+    /// The one place this fraction is computed, so a member deciding whether to ask again and the
+    /// anchor reporting when a member will never disagree about what "due" means.
+    /// </remarks>
+    public static DateTimeOffset RenewsFrom(DateTimeOffset notBefore, DateTimeOffset notAfter) =>
+        notAfter - (notAfter - notBefore) / 3;
 }
 
 /// <summary>

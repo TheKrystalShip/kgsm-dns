@@ -28,6 +28,7 @@ public sealed record ClusterBases(string Zone, string Nodes, string Anchors, str
         NameKind.Member => Nodes + "." + Zone,
         NameKind.Capability => Anchors + "." + Zone,
         NameKind.Game => Play + "." + Zone,
+        NameKind.Alias => Play + "." + Zone,
         _ => Zone,
     };
 
@@ -59,7 +60,8 @@ public sealed record ClusterBases(string Zone, string Nodes, string Anchors, str
     public bool Owns(string? name) =>
         LabelOf(NameKind.Member, name) is not null
         || LabelOf(NameKind.Capability, name) is not null
-        || LabelOf(NameKind.Game, name) is not null;
+        || LabelOf(NameKind.Game, name) is not null
+        || LabelOf(NameKind.Alias, name) is not null;
 
     /// <summary>
     /// The challenge name an ACME order validates a name through.

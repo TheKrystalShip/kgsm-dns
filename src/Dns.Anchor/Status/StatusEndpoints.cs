@@ -92,6 +92,13 @@ internal static class StatusEndpoints
 
         IReadOnlyList<NameRow> rows = registry.All();
         IReadOnlyDictionary<string, IReadOnlyList<DnsPort>> ports = registry.AllPorts();
+
+        // An alias points at the same node its server does, but a person reads "alias of what" off the
+        // server's own name — found here by the same (member, instance) pair the alias was claimed with.
+        Dictionary<(string Member, string Key), string> gameByOwner = rows
+            .Where(r => r.Kind == NameKind.Game)
+            .ToDictionary(r => (r.Member, r.Key), r => r.Name);
+
         List<DnsNameStatus> names =
         [
             .. rows.Select(r => new DnsNameStatus(
@@ -106,7 +113,10 @@ internal static class StatusEndpoints
                 Recorded: !string.IsNullOrEmpty(r.RecordId),
                 UpdatedAt: r.UpdatedAt,
                 Ports: r.Kind == NameKind.Game && ports.TryGetValue(r.Name, out IReadOnlyList<DnsPort>? p) ? p : null,
-                Collisions: r.Kind == NameKind.Game ? collisions.For(r.Name) : null)),
+                Collisions: r.Kind == NameKind.Game ? collisions.For(r.Name) : null,
+                AliasOf: r.Kind == NameKind.Alias && gameByOwner.TryGetValue((r.Member, r.Key), out string? server)
+                    ? server
+                    : null)),
         ];
 
         IReadOnlyList<MemberRow> roster = await services.GetRequiredService<MembersStore>()
@@ -121,7 +131,8 @@ internal static class StatusEndpoints
 
         var certificates = new DnsCertificatesStatus(
             [.. byName.Values.OrderBy(o => o.Name, StringComparer.Ordinal)],
-            orders.IssuedSince(DateTimeOffset.UtcNow.AddDays(-7)));
+            orders.IssuedSince(DateTimeOffset.UtcNow.AddDays(-7)),
+            orders.FailedSince(DateTimeOffset.UtcNow.AddDays(-7)));
 
         return new DnsStatus(DateTimeOffset.UtcNow, standing, zone, names, members, certificates);
     }
@@ -261,7 +272,8 @@ internal static class StatusEndpoints
         return lines;
     }
 
-    private static string Spell(NameState state) => state switch
+    /// <summary>The wire spelling of a registry row's state, shared with the admin write routes.</summary>
+    internal static string Spell(NameState state) => state switch
     {
         NameState.Published => "published",
         NameState.Blocked => "blocked",

@@ -52,7 +52,7 @@ internal sealed class IssuanceQueue(
     {
         var order = new DnsCertificateOrder(
             request.Name, request.Member, "queued", DateTimeOffset.UtcNow, FinishedAt: null, NotAfter: null,
-            Failure: null);
+            RenewsFrom: null, Failure: null);
         if (!_waiting.TryAdd(request.Name, order))
             return false;
 
@@ -74,7 +74,7 @@ internal sealed class IssuanceQueue(
                     ? waiting.RequestedAt
                     : DateTimeOffset.UtcNow;
                 _waiting[request.Name] = new DnsCertificateOrder(
-                    request.Name, request.Member, "issuing", requestedAt, null, null, null);
+                    request.Name, request.Member, "issuing", requestedAt, null, null, null, null);
 
                 try
                 {
@@ -120,23 +120,23 @@ internal sealed class IssuanceQueue(
 
         // Recorded before delivery: the certificate exists and counts against the issuer's limit whether or
         // not the member receives it.
-        DateTimeOffset? notAfter = Expiry(chain);
-        orders.Issued(request.Name, request.Member, requestedAt, notAfter);
+        (DateTimeOffset? notBefore, DateTimeOffset? notAfter) = Validity(chain);
+        orders.Issued(request.Name, request.Member, requestedAt, notBefore, notAfter);
         await journal.IssuedAsync(request.Name, request.Member, notAfter, ct).ConfigureAwait(false);
         return chain;
     }
 
-    /// <summary>The expiry of the leaf certificate at the head of a PEM chain, or null when it cannot be read.</summary>
-    private static DateTimeOffset? Expiry(string chainPem)
+    /// <summary>The validity of the leaf certificate at the head of a PEM chain, or nulls when it cannot be read.</summary>
+    private static (DateTimeOffset? NotBefore, DateTimeOffset? NotAfter) Validity(string chainPem)
     {
         try
         {
             using X509Certificate2 leaf = X509Certificate2.CreateFromPem(chainPem);
-            return new DateTimeOffset(leaf.NotAfter.ToUniversalTime());
+            return (new DateTimeOffset(leaf.NotBefore.ToUniversalTime()), new DateTimeOffset(leaf.NotAfter.ToUniversalTime()));
         }
         catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or ArgumentException)
         {
-            return null;
+            return (null, null);
         }
     }
 }

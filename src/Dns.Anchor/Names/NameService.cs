@@ -160,20 +160,41 @@ public sealed class NameService(
             if (string.IsNullOrEmpty(label))
             {
                 string fallback = DnsLabel.Sanitize(instance);
-                return Save(GameRow(
+                return Save(PlayRow(
                     bases.Compose(NameKind.Game, "unnamed-" + (fallback.Length > 0 ? fallback : "instance")),
-                    member, instance,
+                    NameKind.Game, member, instance,
                     blockedBecause: "no label is free for this game — every numbered name in its series is held"));
             }
 
-            NameRow row = Save(GameRow(bases.Compose(NameKind.Game, label), member, instance));
+            NameRow row = Save(PlayRow(bases.Compose(NameKind.Game, label), NameKind.Game, member, instance));
             logger.LogInformation("{Instance} on {Member} is named {Name}", instance, member, row.Name);
             return row;
         }
     }
 
     /// <summary>
-    /// Give up every game name a node holds for an instance it no longer has.
+    /// Name an existing game server under an additional label, in the play base beside it. The record is
+    /// an alias of the same node the game name is, so it follows the node exactly as the game name does.
+    /// </summary>
+    /// <param name="name">The alias's own fully qualified name, already composed and validated.</param>
+    /// <param name="member">The node the aliased server is on.</param>
+    /// <param name="instance">The aliased server's instance id.</param>
+    /// <returns>The row, or <see langword="null"/> when the name is already held by something.</returns>
+    public NameRow? ClaimAlias(string name, string member, string instance)
+    {
+        lock (_gate)
+        {
+            if (registry.Find(name) is not null)
+                return null;
+
+            NameRow row = Save(PlayRow(name, NameKind.Alias, member, instance));
+            logger.LogInformation("{Name} is an alias of {Instance} on {Member}", name, instance, member);
+            return row;
+        }
+    }
+
+    /// <summary>
+    /// Give up every game name and alias a node holds for an instance it no longer has.
     /// </summary>
     /// <param name="member">The node.</param>
     /// <param name="keep">The instances it still has.</param>
@@ -184,7 +205,7 @@ public sealed class NameService(
         lock (_gate)
         {
             foreach (NameRow row in registry.ForMember(member)
-                         .Where(r => r.Kind == NameKind.Game && !keep.Contains(r.Key)))
+                         .Where(r => (r.Kind == NameKind.Game || r.Kind == NameKind.Alias) && !keep.Contains(r.Key)))
             {
                 registry.Remove(row.Name);
                 released.Add(row.Name);
@@ -198,16 +219,16 @@ public sealed class NameService(
     }
 
     /// <summary>
-    /// Bring every game name to where its node's own name stands, for a node whose name was drawn,
-    /// blocked or published since.
+    /// Bring every game name and alias to where its node's own name stands, for a node whose name was
+    /// drawn, blocked or published since.
     /// </summary>
-    /// <returns>The members whose game names changed.</returns>
+    /// <returns>The members whose game names or aliases changed.</returns>
     public IReadOnlySet<string> RetargetGames()
     {
         var touched = new HashSet<string>(StringComparer.Ordinal);
         lock (_gate)
         {
-            foreach (NameRow row in registry.OfKind(NameKind.Game))
+            foreach (NameRow row in registry.OfKind(NameKind.Game).Concat(registry.OfKind(NameKind.Alias)))
             {
                 if (!ReferenceEquals(RetargetGameLocked(row), row))
                     touched.Add(row.Member);
@@ -223,7 +244,7 @@ public sealed class NameService(
         if (row.Name.StartsWith("unnamed-", StringComparison.Ordinal))
             return row;
 
-        NameRow wanted = GameRow(row.Name, row.Member, row.Key) with { RecordId = row.RecordId };
+        NameRow wanted = PlayRow(row.Name, row.Kind, row.Member, row.Key) with { RecordId = row.RecordId };
 
         bool same = string.Equals(wanted.Content, row.Content, StringComparison.Ordinal)
             && (wanted.State == NameState.Blocked) == (row.State == NameState.Blocked);
@@ -232,13 +253,14 @@ public sealed class NameService(
     }
 
     /// <summary>
-    /// The row a game name should be, given where its node's own name stands.
+    /// The row a game name or an alias of one should be, given where its node's own name stands.
     /// </summary>
     /// <remarks>
-    /// A node name still waiting for its record is usable: the alias resolves as soon as the node's record
-    /// exists, and blocking on it would withdraw every game name on a node each time its host moved.
+    /// A node name still waiting for its record is usable: the row resolves as soon as the node's record
+    /// exists, and blocking on it would withdraw every game name and alias on a node each time its host
+    /// moved.
     /// </remarks>
-    private NameRow GameRow(string name, string member, string instance, string? blockedBecause = null)
+    private NameRow PlayRow(string name, NameKind kind, string member, string instance, string? blockedBecause = null)
     {
         NameRow? node = registry.FindFor(NameKind.Member, member, key: "");
         string? reason = blockedBecause
@@ -248,7 +270,7 @@ public sealed class NameService(
 
         return new NameRow(
             Name: name,
-            Kind: NameKind.Game,
+            Kind: kind,
             Member: member,
             Key: instance,
             Type: "CNAME",

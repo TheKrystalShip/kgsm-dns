@@ -7,8 +7,8 @@ namespace TheKrystalShip.KGSM.Dns.Status;
 /// <summary>The routes the DNS anchor answers a person's browser on.</summary>
 /// <remarks>
 /// Served by the anchor itself and verified against the cluster's sessions, so a cluster whose nodes run
-/// no Control Panel API still has a page for its names. Both are reads; nothing a browser sends changes
-/// the zone.
+/// no Control Panel API still has a page for its names. The reads are open to a viewer; the writes below
+/// need admin and never touch a name this cluster does not already own the base of.
 /// </remarks>
 public static class DnsStatusRoutes
 {
@@ -17,6 +17,18 @@ public static class DnsStatusRoutes
 
     /// <summary>The newest lines of the anchor's own event journal.</summary>
     public const string Events = "/api/v1/cluster/dns/events";
+
+    /// <summary>Ask for a zone pass sooner than the timer would run one.</summary>
+    public const string ZoneCheck = "/api/v1/cluster/dns/zone/check";
+
+    /// <summary>Ask for a certificate to be renewed now. <c>{name}</c> is the certificate's own name.</summary>
+    public const string CertificateRenew = "/api/v1/cluster/dns/certificates/{name}/renew";
+
+    /// <summary>Name an existing game server under an additional label.</summary>
+    public const string Aliases = "/api/v1/cluster/dns/aliases";
+
+    /// <summary>Give up an alias. <c>{name}</c> is the alias's own fully qualified name.</summary>
+    public const string Alias = "/api/v1/cluster/dns/aliases/{name}";
 }
 
 /// <summary>
@@ -125,6 +137,7 @@ public sealed record DnsZonePass(
 /// empty for none, null when it could not be told or is not a game name. Servers on one node are never
 /// compared here — the engine answers for those.
 /// </param>
+/// <param name="AliasOf">The game name an alias follows. Null for any other kind.</param>
 public sealed record DnsNameStatus(
     string Name,
     string Kind,
@@ -137,7 +150,8 @@ public sealed record DnsNameStatus(
     bool Recorded,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<DnsPort>? Ports,
-    IReadOnlyList<DnsCollision>? Collisions);
+    IReadOnlyList<DnsCollision>? Collisions,
+    string? AliasOf);
 
 /// <summary>One member as the DNS anchor knows it.</summary>
 /// <param name="Member">The member id.</param>
@@ -167,9 +181,11 @@ public sealed record DnsMemberStatus(
 /// Certificates issued in the last seven days. The issuer limits certificates per registered domain per
 /// week, and every certificate in a cluster is ordered here.
 /// </param>
+/// <param name="FailedLastWeek">Orders that ended without a certificate in the last seven days.</param>
 public sealed record DnsCertificatesStatus(
     IReadOnlyList<DnsCertificateOrder> Orders,
-    int IssuedLastWeek);
+    int IssuedLastWeek,
+    int FailedLastWeek);
 
 /// <summary>One certificate order.</summary>
 /// <param name="Name">The name it certifies.</param>
@@ -178,6 +194,10 @@ public sealed record DnsCertificatesStatus(
 /// <param name="RequestedAt">When the member asked.</param>
 /// <param name="FinishedAt">When the order ended, or null while it has not.</param>
 /// <param name="NotAfter">When the issued certificate expires, or null when none was issued.</param>
+/// <param name="RenewsFrom">
+/// When the member will ask for a new certificate — the start of this one's last third. Null when no
+/// certificate was issued, or when the order predates this being recorded.
+/// </param>
 /// <param name="Failure">Why no certificate was issued, in one line. Null otherwise.</param>
 public sealed record DnsCertificateOrder(
     string Name,
@@ -186,11 +206,19 @@ public sealed record DnsCertificateOrder(
     DateTimeOffset RequestedAt,
     DateTimeOffset? FinishedAt,
     DateTimeOffset? NotAfter,
+    DateTimeOffset? RenewsFrom,
     string? Failure);
+
+/// <summary>What a browser posts to name an existing game server under an additional label.</summary>
+/// <param name="Server">The game name to alias — an existing, published game name.</param>
+/// <param name="Label">The label the alias takes, inside the play base beside its server.</param>
+public sealed record DnsAliasRequest(string Server, string Label);
 
 /// <summary>Every status shape, serialized without reflection.</summary>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
 [JsonSerializable(typeof(DnsStatus))]
+[JsonSerializable(typeof(DnsNameStatus))]
+[JsonSerializable(typeof(DnsAliasRequest))]
 public sealed partial class DnsStatusJsonContext : JsonSerializerContext;
