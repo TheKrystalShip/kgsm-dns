@@ -5,6 +5,25 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0]
+
+### Added — a member renews a certificate when an admin asks
+
+- **`DnsRenewHandler`**, registered by `AddKgsmDnsMember`, answers `dns.renew`: from the member holding
+  `dns`, for a name this member holds published, it asks for that name's certificate at once through
+  `CertificateKeeper.ForceAsync`. A renewal from any other member, or for a name not published here, is
+  logged and dropped. "Renew now" on another member's name therefore produces a new certificate on that
+  member rather than a journalled request nobody answered.
+### Fixed — a renewed certificate is the one the web server answers with
+
+A new certificate is written to the path the generated site already names, so the site itself does not
+change and the web server goes on answering with the certificate it read into memory. `NginxSite` now
+reloads when a name is proved to be served with any certificate other than the one held for it, and
+proves it again after. A name that answers nothing is unreachable from the member itself, which a
+reload does not change, so that one is reported as before.
+
+- `TheKrystalShip.KGSM.Dns 0.2.0-dev.14`: `DnsRenewHandler`, and the reload a renewal needs.
+
 ## [0.11.0]
 
 ### Added — an admin can act on what the anchor holds

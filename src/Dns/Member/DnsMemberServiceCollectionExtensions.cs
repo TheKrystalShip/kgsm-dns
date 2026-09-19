@@ -71,6 +71,7 @@ public static class DnsMemberServiceCollectionExtensions
         services.AddSingleton<DnsNamesFetcher>();
         services.AddSingleton<IClusterMessageHandler, DnsNamesHandler>();
         services.AddSingleton<IClusterMessageHandler, DnsCertHandler>();
+        services.AddSingleton<IClusterMessageHandler, DnsRenewHandler>();
         services.AddHostedService<DnsSelfWorker>();
         return services;
     }

@@ -44,7 +44,10 @@ public sealed record NginxSiteOptions(string Component, string SitesDirectory, s
 /// <b>Reloaded, then proved.</b> A reload keeps serving the old configuration if the new one does not
 /// load, and says so only in the server's own log. So after a reload the site is checked the way a
 /// client sees it: a TLS handshake to this machine naming each name, comparing the certificate served
-/// with the one on disk.
+/// with the one on disk. The proof is also what a renewal is caught by: a new certificate is written to
+/// the path the site already names, so nothing about the configuration changes and the web server keeps
+/// answering with what it read into memory — a name answering with any other certificate than the one
+/// held for it is reloaded and proved again.
 /// </para>
 /// </remarks>
 public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, ILogger<NginxSite> logger)
@@ -91,6 +94,7 @@ public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, 
 
         string wanted = Render(served);
         string current = File.Exists(options.SitePath) ? await File.ReadAllTextAsync(options.SitePath, ct).ConfigureAwait(false) : "";
+        bool reloaded = false;
 
         if (!string.Equals(wanted, current, StringComparison.Ordinal))
         {
@@ -100,26 +104,51 @@ public sealed class NginxSite(NginxSiteOptions options, CertificateFiles files, 
 
             if (!await ReloadAsync(ct).ConfigureAwait(false))
                 return false;
+
+            reloaded = true;
         }
 
+        (List<string> proven, bool stale) = await ProveAsync(served, ct).ConfigureAwait(false);
+
+        // A renewed certificate is written to the path the site already names, so the file the web server
+        // loads at startup is the same one and nothing about the configuration changed. It goes on
+        // answering with the certificate it read into memory until it is told to read the file again — so
+        // a name proved to be served with a certificate other than the one on disk is reloaded and proved
+        // again. A name that answers nothing is not reachable from this machine, which a reload does not
+        // change.
+        if (stale && !reloaded && await ReloadAsync(ct).ConfigureAwait(false))
+            (proven, _) = await ProveAsync(served, ct).ConfigureAwait(false);
+
+        _served = proven;
+        return proven.Count == served.Count;
+    }
+
+    /// <summary>
+    /// Check each name the way a client sees it, and report whether any is answered with a certificate
+    /// other than the one held for it.
+    /// </summary>
+    private async Task<(List<string> Proven, bool Stale)> ProveAsync(
+        IReadOnlyList<HeldCertificate> served, CancellationToken ct)
+    {
         var proven = new List<string>(served.Count);
+        bool stale = false;
+
         foreach (HeldCertificate certificate in served)
         {
             string? live = await ServedFingerprintAsync(certificate.Name, ct).ConfigureAwait(false);
             if (string.Equals(live, certificate.Fingerprint, StringComparison.OrdinalIgnoreCase))
             {
                 proven.Add(certificate.Name);
+                continue;
             }
-            else
-            {
-                logger.LogWarning(
-                    "{Name} is not served with the certificate on disk — the web server answers with {Live}",
-                    certificate.Name, live ?? "nothing");
-            }
+
+            stale |= live is not null;
+            logger.LogWarning(
+                "{Name} is not served with the certificate on disk — the web server answers with {Live}",
+                certificate.Name, live ?? "nothing");
         }
 
-        _served = proven;
-        return proven.Count == served.Count;
+        return (proven, stale);
     }
 
     internal string Render(IReadOnlyList<HeldCertificate> served)
