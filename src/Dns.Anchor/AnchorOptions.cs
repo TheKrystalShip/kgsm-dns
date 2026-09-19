@@ -28,6 +28,9 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// <param name="RegistryPath">Where claimed names are recorded.</param>
 /// <param name="ClusterStorePath">Where this member keeps its roster, outbox and inbox.</param>
 /// <param name="ConfigDescriptorPath">Where the descriptor this build wrote is installed.</param>
+/// <param name="AllowedOrigins">Browser origins allowed to read this anchor's status.</param>
+/// <param name="AccountsPath">Where this anchor keeps its copy of the cluster's accounts.</param>
+/// <param name="SessionsPath">Where sessions ended elsewhere in the cluster are recorded.</param>
 internal sealed record AnchorOptions(
     string MemberId,
     string ListenAddress,
@@ -45,7 +48,10 @@ internal sealed record AnchorOptions(
     string AcmeAccountKeyPath,
     string RegistryPath,
     string ClusterStorePath,
-    string ConfigDescriptorPath)
+    string ConfigDescriptorPath,
+    IReadOnlyList<string> AllowedOrigins,
+    string AccountsPath,
+    string SessionsPath)
 {
     /// <summary>Whether a zone and a credential are configured well enough to publish anything.</summary>
     /// <remarks>
@@ -92,7 +98,12 @@ internal sealed record AnchorOptions(
             AcmeAccountKeyPath: settings.AcmeAccountKeyPath.Trim(),
             RegistryPath: settings.RegistryPath.Trim(),
             ClusterStorePath: settings.ClusterStorePath.Trim(),
-            ConfigDescriptorPath: settings.ConfigDescriptorPath.Trim());
+            ConfigDescriptorPath: settings.ConfigDescriptorPath.Trim(),
+            // An origin is compared exactly, and a trailing slash is the most common way to write one
+            // that never matches.
+            AllowedOrigins: [.. Csv(settings.AllowedOrigins).Select(o => o.TrimEnd('/'))],
+            AccountsPath: settings.AccountsPath.Trim(),
+            SessionsPath: settings.SessionsPath.Trim());
     }
 
     private static string Label(string written, string fallback)

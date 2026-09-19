@@ -69,6 +69,14 @@
     "RegistryPath": "/var/lib/kgsm-dns/names.db",
     "ClusterStorePath": "/var/lib/kgsm-dns/cluster.db",
 
+    // Who may read this anchor's page. A browser signs in once, at the member holding the cluster's
+    // accounts, and its session is verified here against that member's published key; the person's
+    // authority is read from this anchor's own copy of the accounts on every request, and a session
+    // ended elsewhere is recorded so it is refused here too. The origins are the Control Panel's.
+    "AllowedOrigins": "https://kgsm.thekrystalship.com",
+    "AccountsPath": "/var/lib/kgsm-dns/accounts.db",
+    "SessionsPath": "/var/lib/kgsm-dns/sessions.db",
+
     // The descriptor this build wrote, as the deploy installs it. Read to render this anchor's own
     // configuration page; absent, there is no page.
     "ConfigDescriptorPath": "/var/lib/kgsm/anchors/dns-anchor.json"

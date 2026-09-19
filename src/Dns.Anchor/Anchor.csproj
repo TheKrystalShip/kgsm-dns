@@ -14,7 +14,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns.Anchor</RootNamespace>
     <AssemblyName>kgsm-dns</AssemblyName>
-    <Version>0.9.0</Version>
+    <Version>0.10.0</Version>
 
     <!-- The config descriptor is generated from AnchorSettings by TheKrystalShip.KGSM.ComponentConfig.
          These name the two files it works between; the attribute source, the documentation file the
@@ -44,6 +44,17 @@
 
     <!-- The registry, on the daemon's own file. -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+
+    <!-- This anchor's own event journal: what it did to the zone and what it ordered from the issuer. -->
+    <PackageReference Include="TheKrystalShip.KGSM.Journal" Version="2.2.0" />
+
+    <!-- Who may read this anchor's page. It mints no session: it verifies the ones the member holding
+         `auth` mints against the key that member publishes, and reads each person's authority from its
+         own copy of the accounts that member publishes. The same packages every member verifies with. -->
+    <PackageReference Include="TheKrystalShip.KGSM.Auth" Version="3.3.0" />
+    <PackageReference Include="TheKrystalShip.KGSM.Auth.Sessions" Version="2.2.0-dev.2" />
+    <PackageReference Include="TheKrystalShip.KGSM.Auth.Users" Version="1.4.0-dev.6" />
+    <PackageReference Include="TheKrystalShip.KGSM.Auth.Cluster" Version="1.0.0-dev.5" />
   </ItemGroup>
 
   <ItemGroup>

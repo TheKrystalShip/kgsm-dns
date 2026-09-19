@@ -34,8 +34,18 @@ internal sealed class FakeProvider : IDnsProvider
     public Task<IReadOnlyList<ProviderRecord>> ListAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<ProviderRecord>>([.. _records]);
 
+    /// <summary>How many more creates succeed before the provider stops answering. Null for no limit.</summary>
+    public int? CreatesBeforeOutage { get; set; }
+
     public Task<ProviderRecord> CreateAsync(DesiredRecord record, CancellationToken ct = default)
     {
+        if (CreatesBeforeOutage is { } left)
+        {
+            if (left <= 0)
+                throw new DnsProviderException("the provider did not answer");
+            CreatesBeforeOutage = left - 1;
+        }
+
         if (Find(record.Name) is not null)
             throw new DnsNameTakenException(record.Name, "a record with that host already exists");
 

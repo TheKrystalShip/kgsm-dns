@@ -350,6 +350,23 @@ public sealed class SqliteNameRegistry
         return members;
     }
 
+    /// <summary>Every member's statement of where it is reached, and when it last made it.</summary>
+    public IReadOnlyList<(string Member, string Host, DateTimeOffset StatedAt)> StatedHosts()
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT member, host, stated_at FROM hosts ORDER BY member";
+        var hosts = new List<(string, string, DateTimeOffset)>();
+        using SqliteDataReader reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            hosts.Add((reader.GetString(0), reader.GetString(1), DateTimeOffset.Parse(
+                reader.GetString(2), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)));
+        }
+
+        return hosts;
+    }
+
     /// <summary>Whether any row holds this name.</summary>
     public bool Holds(string name) => Find(name) is not null;
 

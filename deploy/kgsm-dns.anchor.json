@@ -42,14 +42,19 @@
       "order": 4
     },
     {
+      "id": "access",
+      "label": "Access",
+      "order": 5
+    },
+    {
       "id": "storage",
       "label": "Storage",
-      "order": 5
+      "order": 6
     },
     {
       "id": "general",
       "label": "General",
-      "order": 6
+      "order": 7
     }
   ],
   "fields": [
@@ -240,6 +245,16 @@
       "risk": "destructive"
     },
     {
+      "key": "allowedOrigins",
+      "env": "Dns__AllowedOrigins",
+      "label": "Allowed browser origins",
+      "description": "The browser origins allowed to read this anchor's page, comma-separated — normally the Control Panel's address. The panel is served from a different origin, so without an entry for it the browser refuses the answer before the page can read it.",
+      "group": "access",
+      "type": "csv",
+      "default": "https://kgsm.thekrystalship.com",
+      "risk": "wiring"
+    },
+    {
       "key": "registryPath",
       "env": "Dns__RegistryPath",
       "label": "Name registry",
@@ -258,6 +273,26 @@
       "type": "path",
       "default": "/var/lib/kgsm-dns/cluster.db",
       "risk": "destructive"
+    },
+    {
+      "key": "accountsPath",
+      "env": "Dns__AccountsPath",
+      "label": "Account copy",
+      "description": "This anchor's own copy of the cluster's accounts, filled by the member that holds them. It is what decides who may read this page, read afresh on every request.",
+      "group": "storage",
+      "type": "path",
+      "default": "/var/lib/kgsm-dns/accounts.db",
+      "risk": "wiring"
+    },
+    {
+      "key": "sessionsPath",
+      "env": "Dns__SessionsPath",
+      "label": "Ended sessions",
+      "description": "The sessions somebody signed out of elsewhere in the cluster, kept so this anchor refuses them too until they would have expired.",
+      "group": "storage",
+      "type": "path",
+      "default": "/var/lib/kgsm-dns/sessions.db",
+      "risk": "safe"
     },
     {
       "key": "configDescriptorPath",

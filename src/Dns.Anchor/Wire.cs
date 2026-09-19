@@ -25,6 +25,11 @@ internal sealed record AnchorIdentity(
     bool Configured,
     string Zone);
 
+/// <summary>Why a request was not answered, for a browser to show.</summary>
+/// <param name="Error">A stable code a client matches on.</param>
+/// <param name="Message">The reason, in a sentence a person can act on.</param>
+internal sealed record AnchorError(string Error, string Message);
+
 /// <summary>
 /// Every shape this daemon serializes.
 /// </summary>
@@ -36,4 +41,5 @@ internal sealed record AnchorIdentity(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(AnchorIdentity))]
+[JsonSerializable(typeof(AnchorError))]
 internal sealed partial class AnchorJsonContext : JsonSerializerContext;

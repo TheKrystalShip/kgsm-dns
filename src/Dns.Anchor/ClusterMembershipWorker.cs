@@ -5,6 +5,7 @@ using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
+using TheKrystalShip.KGSM.Dns.Anchor.Status;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor;
 
@@ -37,6 +38,8 @@ internal sealed class ClusterMembershipWorker(
     RecordReconciler reconciler,
     SqliteNameRegistry registry,
     NamesAnnouncer announcer,
+    ZonePassLog passes,
+    DnsJournal journal,
     ILogger<ClusterMembershipWorker> logger)
     : ClusterCapabilityWorker(DnsCapability.Name, cluster, state, logger)
 {
@@ -47,7 +50,11 @@ internal sealed class ClusterMembershipWorker(
     /// Bring the next zone pass forward to the next tick, for a claim that should not wait out the
     /// whole interval — a node that has just said where it is reached.
     /// </summary>
-    public void RequestZonePass() => _nextZonePass = DateTimeOffset.MinValue;
+    public void RequestZonePass()
+    {
+        _nextZonePass = DateTimeOffset.MinValue;
+        passes.Next(DateTimeOffset.UtcNow);
+    }
 
     protected override async Task OnStandingAsync(
         CapabilityHolding holding, bool changed, CancellationToken ct)
@@ -55,10 +62,15 @@ internal sealed class ClusterMembershipWorker(
         // Standing by means another member holds the capability and is writing the zone. Two writers
         // would each reconcile the other's records away, so this one does nothing at all.
         if (holding.Standing == CapabilityStanding.StandingBy)
+        {
+            passes.Next(null);
             return;
+        }
 
         if (!options.Configured)
         {
+            passes.Next(null);
+
             // Said once rather than every pass: an anchor with no zone or no credential is a normal
             // state to be installed in, and it is the answer to "why is nothing being published".
             if (!_saidUnconfigured)
@@ -77,6 +89,7 @@ internal sealed class ClusterMembershipWorker(
         // The registry is read against the zone before anything is claimed. A holder whose store was
         // lost would otherwise draw itself a new name and then withdraw the one it is reached at. Until
         // the zone can be read, nothing is claimed and the next pass asks again.
+        DateTimeOffset readAt = DateTimeOffset.UtcNow;
         try
         {
             await reconciler.EnsureReadyAsync(ct).ConfigureAwait(false);
@@ -84,6 +97,7 @@ internal sealed class ClusterMembershipWorker(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "the zone could not be read — claiming nothing until it can be");
+            await ZoneFailedAsync(readAt, ex, ct).ConfigureAwait(false);
             return;
         }
 
@@ -127,11 +141,31 @@ internal sealed class ClusterMembershipWorker(
         }
 
         _nextZonePass = now + options.Reconcile;
+        passes.Next(_nextZonePass);
+
+        RecordReconciler.Pass pass;
+        try
+        {
+            pass = await reconciler.RunAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The zone is somebody else's service and it is allowed to be unreachable. Nothing is
+            // dropped by a failed pass: the registry still says what the cluster wants, and the next
+            // pass writes it. What this one already changed is in the zone, so it is recorded all the same.
+            logger.LogWarning(ex, "the zone could not be brought to what the registry says");
+            await journal.PassAsync(new RecordReconciler.Pass(reconciler.TakeUnreported(), []), ct)
+                .ConfigureAwait(false);
+            await ZoneFailedAsync(now, ex, ct).ConfigureAwait(false);
+            return;
+        }
+
+        if (passes.Succeeded(now, DateTimeOffset.UtcNow - now, pass))
+            await journal.ZoneAsync(reachable: true, error: null, ct).ConfigureAwait(false);
+        await journal.PassAsync(pass, ct).ConfigureAwait(false);
 
         try
         {
-            RecordReconciler.Pass pass = await reconciler.RunAsync(ct).ConfigureAwait(false);
-
             // A quiet pass is the normal case and says nothing, so the log carries what changed rather
             // than a line per interval that an operator learns to scroll past.
             if (!pass.Quiet)
@@ -149,9 +183,10 @@ internal sealed class ClusterMembershipWorker(
             // Port collisions are checked on the same cadence — hosts are resolved again each time, since a
             // dynamic-DNS name moves with the address behind it — and a member whose servers' collisions
             // changed is told as well.
-            IReadOnlySet<string> collided = await collisions.RefreshAsync(ct).ConfigureAwait(false);
+            IReadOnlySet<string> collided = await collisions
+                .RefreshAsync(ct, (options.MemberId, options.PublicHost)).ConfigureAwait(false);
             IEnumerable<string> told = touched.Concat(collided);
-            if (!pass.Quiet || pass.Contested > 0)
+            if (!pass.Quiet || pass.NewlyContested > 0)
                 told = told.Concat(registry.All().Select(r => r.Member)).Concat(registry.StatedMembers());
 
             foreach (string member in told
@@ -163,10 +198,16 @@ internal sealed class ClusterMembershipWorker(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // The zone is somebody else's service and it is allowed to be unreachable. Nothing is
-            // dropped by a failed pass: the registry still says what the cluster wants, and the next
-            // pass writes it.
-            logger.LogWarning(ex, "the zone could not be brought to what the registry says");
+            // The zone is already brought to the registry; what failed is telling the members about it.
+            // A member also fetches its names itself, and is told again by the next pass that moves one.
+            logger.LogWarning(ex, "members could not be told where their names stand");
         }
+    }
+
+    /// <summary>Record a pass that could not complete, and journal it when it is the first of an outage.</summary>
+    private async Task ZoneFailedAsync(DateTimeOffset startedAt, Exception ex, CancellationToken ct)
+    {
+        if (passes.Failed(startedAt, DateTimeOffset.UtcNow - startedAt, ex.Message))
+            await journal.ZoneAsync(reachable: false, ex.Message, ct).ConfigureAwait(false);
     }
 }

@@ -72,6 +72,14 @@ component becoming something else.
   build from `AnchorSettings` and `Descriptor.cs`. The `.anchor.json` suffix routes it to
   `/var/lib/kgsm/anchors/`, which is not where a node's leaves are scanned for.
 - **Logging is `AddSystemdConsole()`** with the ecosystem's level convention.
+- **The browser surface is reads, behind the cluster's session.** `Status/StatusEndpoints` serves
+  `/api/v1/cluster/dns` and its `/events`; `Access/ClusterBearer` admits a caller through the shared
+  `ClusterSessionValidation` (its own half is a key that signs nothing) and reads authority from this
+  anchor's own account copy (`AnchorAccounts`) on every request. Nothing reachable from a browser writes
+  the zone, the registry or the issuer.
+- **The journal records transitions, never passes.** `RecordReconciler.Pass.Changes` carries every
+  change a pass made; a pass that fails partway hands what it already did to `TakeUnreported`, because
+  the zone holds it either way. The zone's own standing is journalled only when it flips.
 
 ## Testing
 

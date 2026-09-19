@@ -29,6 +29,7 @@ internal sealed class CsrHandler(
     IssuanceQueue queue,
     IClusterBus bus,
     AnchorOptions options,
+    Status.DnsJournal journal,
     ILogger<CsrHandler> logger) : IClusterMessageHandler
 {
     public string Type => DnsMessageTypes.Csr;
@@ -54,6 +55,8 @@ internal sealed class CsrHandler(
             logger.LogWarning(
                 "{From} asked for a certificate for {Name}, which it does not hold published — refused",
                 envelope.From, request.Name);
+            await journal.RefusedAsync(request.Name, envelope.From,
+                "the name is not one this member holds published", ct).ConfigureAwait(false);
             return;
         }
 
@@ -71,6 +74,7 @@ internal sealed class CsrHandler(
         if (SigningRequestCheck.Refusal(der, request.Name) is { } refusal)
         {
             logger.LogWarning("the signing request from {From} is refused: {Refusal}", envelope.From, refusal);
+            await journal.RefusedAsync(request.Name, envelope.From, refusal, ct).ConfigureAwait(false);
             return;
         }
 

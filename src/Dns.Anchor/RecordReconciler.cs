@@ -42,20 +42,51 @@ public sealed class RecordReconciler(
     int ttlSeconds,
     ILogger<RecordReconciler> logger)
 {
-    /// <summary>What one pass did, for the caller to log or report.</summary>
-    /// <param name="Published">Records created.</param>
-    /// <param name="Moved">Records whose content, TTL or proxying was corrected.</param>
-    /// <param name="Removed">Records deleted because no row wants them.</param>
-    /// <param name="Recovered">Rows rebuilt from marks.</param>
-    /// <param name="Contested">Names a record this cluster does not own is holding.</param>
-    public readonly record struct Pass(int Published, int Moved, int Removed, int Recovered, int Contested)
+    /// <summary>What one pass did, for the caller to log, record or report.</summary>
+    /// <param name="Changes">Every change the pass made to the zone or learned from it, in the order made.</param>
+    /// <param name="Contested">
+    /// Every name a record this cluster does not own is holding, as the pass found the zone — those it
+    /// found this time and those it found before and that are still held.
+    /// </param>
+    public sealed record Pass(IReadOnlyList<ZoneChange> Changes, IReadOnlyList<string> Contested)
     {
+        /// <summary>Records created.</summary>
+        public int Published => Count(ZoneChangeKind.Published);
+
+        /// <summary>Records whose content, TTL or proxying was corrected.</summary>
+        public int Moved => Count(ZoneChangeKind.Moved);
+
+        /// <summary>Records deleted because no row wants them, or their row can point nowhere.</summary>
+        public int Removed => Count(ZoneChangeKind.Withdrawn);
+
+        /// <summary>Rows rebuilt from marks.</summary>
+        public int Recovered => Count(ZoneChangeKind.Recovered);
+
+        /// <summary>Names this pass found held by a record this cluster does not own.</summary>
+        public int NewlyContested => Count(ZoneChangeKind.Contested);
+
         /// <summary>Whether anything at all happened, which is what decides if a pass is worth a line.</summary>
         public bool Quiet => Published == 0 && Moved == 0 && Removed == 0 && Recovered == 0;
+
+        private int Count(ZoneChangeKind kind) => Changes.Count(c => c.Kind == kind);
     }
 
     private bool _read;
-    private int _recovered;
+
+    // Changes made and not yet handed to a caller: a recovery, reported by the first pass after it, and
+    // whatever a pass that failed partway had already done to the zone before it failed.
+    private List<ZoneChange> _unreported = [];
+
+    /// <summary>
+    /// Take the changes a failed pass made before it failed. The zone holds them whether or not the pass
+    /// finished, so they are as real as any a completed pass reports.
+    /// </summary>
+    public IReadOnlyList<ZoneChange> TakeUnreported()
+    {
+        List<ZoneChange> taken = _unreported;
+        _unreported = [];
+        return taken;
+    }
 
     /// <summary>Whether this member has read its registry against the zone yet.</summary>
     public bool Ready => _read;
@@ -82,7 +113,7 @@ public sealed class RecordReconciler(
         IReadOnlyList<ProviderRecord> zone = await provider.ListAsync(ct).ConfigureAwait(false);
 
         if (registry.All().Count == 0)
-            _recovered = Recover(Ours(zone));
+            _unreported.AddRange(Recover(Ours(zone)));
 
         _read = true;
     }
@@ -95,16 +126,15 @@ public sealed class RecordReconciler(
         IReadOnlyList<ProviderRecord> zone = await provider.ListAsync(ct).ConfigureAwait(false);
         List<ProviderRecord> ours = Ours(zone);
 
-        // Reported on the first pass after it happened, so a recovery appears in the same line as
-        // everything else a pass did.
-        int recovered = _recovered;
-        _recovered = 0;
+        // Held until this pass returns, so a recovery appears in the same report as everything else the
+        // pass did, and a failure below leaves what was already done for TakeUnreported.
+        List<ZoneChange> changes = _unreported;
 
         var byName = new Dictionary<string, ProviderRecord>(StringComparer.OrdinalIgnoreCase);
         foreach (ProviderRecord record in zone)
             byName.TryAdd(record.Name, record);
 
-        int published = 0, moved = 0, removed = 0, contested = 0;
+        var contested = new List<string>();
 
         foreach (NameRow row in registry.All())
         {
@@ -124,7 +154,14 @@ public sealed class RecordReconciler(
                     await provider.DeleteAsync(held.Id, ct).ConfigureAwait(false);
                     registry.Put(row with { RecordId = "", UpdatedAt = DateTimeOffset.UtcNow });
                     logger.LogInformation("withdrew {Name}: {Note}", row.Name, row.Note);
-                    removed++;
+                    changes.Add(ZoneChange.Of(ZoneChangeKind.Withdrawn, row, reason: row.Note));
+                }
+                else if (held is not null)
+                {
+                    // A contested row stays blocked and is not tried again, so it is found here on every
+                    // pass after the one that contested it — which is what keeps it on the list for as
+                    // long as the record that holds the name is there.
+                    contested.Add(row.Name);
                 }
 
                 continue;
@@ -143,7 +180,7 @@ public sealed class RecordReconciler(
                         Note = "",
                         UpdatedAt = DateTimeOffset.UtcNow,
                     });
-                    published++;
+                    changes.Add(ZoneChange.Of(ZoneChangeKind.Published, row));
                 }
                 catch (DnsNameTakenException ex)
                 {
@@ -151,7 +188,8 @@ public sealed class RecordReconciler(
                     // keeps two claims from both succeeding. The listing above did not show it, so the
                     // record appeared between the two calls.
                     Contest(row, ex.Message);
-                    contested++;
+                    changes.Add(ZoneChange.Of(ZoneChangeKind.Contested, row, reason: ex.Message));
+                    contested.Add(row.Name);
                 }
 
                 continue;
@@ -159,8 +197,10 @@ public sealed class RecordReconciler(
 
             if (held.Mark is null)
             {
-                Contest(row, "a record this cluster did not publish holds this name");
-                contested++;
+                const string note = "a record this cluster did not publish holds this name";
+                Contest(row, note);
+                changes.Add(ZoneChange.Of(ZoneChangeKind.Contested, row, reason: note));
+                contested.Add(row.Name);
                 continue;
             }
 
@@ -182,7 +222,7 @@ public sealed class RecordReconciler(
                     Note = "",
                     UpdatedAt = DateTimeOffset.UtcNow,
                 });
-                moved++;
+                changes.Add(ZoneChange.Of(ZoneChangeKind.Moved, row, from: held.Content));
             }
             else if (row.State != NameState.Published || row.RecordId != held.Id)
             {
@@ -207,10 +247,16 @@ public sealed class RecordReconciler(
 
             await provider.DeleteAsync(record.Id, ct).ConfigureAwait(false);
             logger.LogInformation("withdrew {Name}", record.Name);
-            removed++;
+
+            // The row is gone, so what the name was is read off the mark the record carried.
+            RecordMark mark = record.Mark!.Value;
+            changes.Add(new ZoneChange(
+                ZoneChangeKind.Withdrawn, record.Name, mark.Kind, mark.Member, mark.Key,
+                record.Type, record.Content, From: null, Reason: null));
         }
 
-        return new Pass(published, moved, removed, recovered, contested);
+        _unreported = [];
+        return new Pass(changes, contested);
     }
 
     /// <summary>
@@ -221,16 +267,16 @@ public sealed class RecordReconciler(
     /// registry does not have. A row that exists stays authoritative, so a stale record can never
     /// overwrite what the cluster currently wants.
     /// </remarks>
-    private int Recover(IReadOnlyList<ProviderRecord> ours)
+    private List<ZoneChange> Recover(IReadOnlyList<ProviderRecord> ours)
     {
-        int recovered = 0;
+        var recovered = new List<ZoneChange>();
 
         foreach (ProviderRecord record in ours)
         {
             if (record.Mark is not { } mark || registry.Find(record.Name) is not null)
                 continue;
 
-            registry.Put(new NameRow(
+            var row = new NameRow(
                 Name: record.Name,
                 Kind: mark.Kind,
                 Member: mark.Member,
@@ -240,11 +286,12 @@ public sealed class RecordReconciler(
                 State: NameState.Published,
                 RecordId: record.Id,
                 Note: "",
-                UpdatedAt: DateTimeOffset.UtcNow));
+                UpdatedAt: DateTimeOffset.UtcNow);
+            registry.Put(row);
 
             logger.LogInformation(
                 "recovered {Name} from the zone — {Member} holds it", record.Name, mark.Member);
-            recovered++;
+            recovered.Add(ZoneChange.Of(ZoneChangeKind.Recovered, row));
         }
 
         return recovered;
@@ -278,4 +325,50 @@ public sealed class RecordReconciler(
 
     private DesiredRecord Desired(NameRow row) =>
         new(row.Name, row.Type, row.Content, ttlSeconds, row.Mark.ToString());
+}
+
+/// <summary>What a zone pass did to one name.</summary>
+public enum ZoneChangeKind
+{
+    /// <summary>A record was created.</summary>
+    Published,
+
+    /// <summary>A record was corrected to what the registry says.</summary>
+    Moved,
+
+    /// <summary>A record was deleted.</summary>
+    Withdrawn,
+
+    /// <summary>A record this cluster does not own was found holding the name.</summary>
+    Contested,
+
+    /// <summary>A registry row was rebuilt from the record's mark.</summary>
+    Recovered,
+}
+
+/// <summary>One change a zone pass made, or learned from the zone.</summary>
+/// <param name="Kind">What happened.</param>
+/// <param name="Name">The name it happened to.</param>
+/// <param name="NameKind">What the name names.</param>
+/// <param name="Member">The member it belongs, or belonged, to.</param>
+/// <param name="Key">The capability or instance, empty for a node's own name.</param>
+/// <param name="Type">The record type.</param>
+/// <param name="Content">What the record points at, or pointed at when it was withdrawn.</param>
+/// <param name="From">What a moved record pointed at before. Null otherwise.</param>
+/// <param name="Reason">Why a name was withdrawn or contested, when there is a reason to give.</param>
+public sealed record ZoneChange(
+    ZoneChangeKind Kind,
+    string Name,
+    NameKind NameKind,
+    string Member,
+    string Key,
+    string Type,
+    string Content,
+    string? From,
+    string? Reason)
+{
+    /// <summary>A change to the name one row holds.</summary>
+    public static ZoneChange Of(ZoneChangeKind kind, NameRow row, string? from = null, string? reason = null) =>
+        new(kind, row.Name, row.Kind, row.Member, row.Key, row.Type, row.Content, from,
+            string.IsNullOrEmpty(reason) ? null : reason);
 }

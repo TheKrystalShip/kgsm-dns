@@ -64,6 +64,16 @@ public sealed class PortCollisions(SqliteNameRegistry registry, IHostResolver re
     private volatile IReadOnlyDictionary<string, IReadOnlyList<DnsCollision>?> _current =
         new Dictionary<string, IReadOnlyList<DnsCollision>?>(StringComparer.Ordinal);
 
+    private volatile IReadOnlyDictionary<string, IReadOnlySet<IPAddress>?> _addresses =
+        new Dictionary<string, IReadOnlySet<IPAddress>?>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// What a member's stated host resolved to at the last check: empty for a member that stated none,
+    /// null when it could not be resolved or the member has not been checked.
+    /// </summary>
+    public IReadOnlySet<IPAddress>? AddressesOf(string member) =>
+        _addresses.TryGetValue(member, out IReadOnlySet<IPAddress>? addresses) ? addresses : null;
+
     /// <summary>
     /// A game name's collisions as of the last check: empty for none, null when it could not be told or
     /// the name has not been checked.
@@ -73,17 +83,30 @@ public sealed class PortCollisions(SqliteNameRegistry registry, IHostResolver re
 
     /// <summary>Check every game name again.</summary>
     /// <returns>The members holding a name whose collisions changed, so each can be told.</returns>
-    public async Task<IReadOnlySet<string>> RefreshAsync(CancellationToken ct)
+    /// <param name="ct">Cancels the check.</param>
+    /// <param name="self">
+    /// The member running the check, and the host its configuration states. It states none to itself, so
+    /// without this it would be the one member whose address is never known.
+    /// </param>
+    public async Task<IReadOnlySet<string>> RefreshAsync(
+        CancellationToken ct, (string Member, string Host)? self = null)
     {
         IReadOnlyList<NameRow> games = registry.OfKind(NameKind.Game);
         IReadOnlyDictionary<string, IReadOnlyList<DnsPort>> ports = registry.AllPorts();
 
+        // Every member that stated a host is resolved, not only those running a game server, so the
+        // members sharing a router can be seen before either of them runs one.
         var addresses = new Dictionary<string, IReadOnlySet<IPAddress>?>(StringComparer.Ordinal);
-        foreach (string member in games.Select(g => g.Member).Distinct(StringComparer.Ordinal))
+        foreach (string member in games.Select(g => g.Member)
+                     .Concat(registry.StatedMembers())
+                     .Concat(self is { } s ? [s.Member] : [])
+                     .Distinct(StringComparer.Ordinal))
         {
             // Never stated is unknown; stated none is a node nobody outside reaches, which shares no
             // public address with anything.
-            string? host = registry.HostOf(member);
+            string? host = self is { } me && string.Equals(member, me.Member, StringComparison.Ordinal)
+                ? me.Host
+                : registry.HostOf(member);
             if (host is not null && string.IsNullOrWhiteSpace(host))
             {
                 addresses[member] = new HashSet<IPAddress>();
@@ -109,6 +132,7 @@ public sealed class PortCollisions(SqliteNameRegistry registry, IHostResolver re
         }
 
         _current = next;
+        _addresses = addresses;
         return touched;
     }
 

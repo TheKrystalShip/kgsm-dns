@@ -75,11 +75,36 @@ only names and certificate paths and including the component's own reviewed prox
 nginx through a grant that allows nothing else and checks the result over a real TLS handshake.
 Certificates are renewed in the last third of their lifetime.
 
+## What a person can read
+
+The anchor answers a browser directly, so a cluster's names have a page whether or not any node runs
+a Control Panel API. Both routes are reads; nothing a browser sends reaches the zone.
+
+| route | answers |
+|---|---|
+| `GET /api/v1/cluster/dns` | the whole picture as one `DnsStatus`: this member's standing (holder or standing by, configured, zone, bases, cadence, issuer), the zone's health (last pass, its duration, error and what it changed, next pass, contested names), every name with its target, state, block reason, declared ports and cross-member port collisions, every member with where it said it is reached, when, and what that resolved to, and every certificate order with its expiry and the count issued in the last week |
+| `GET /api/v1/cluster/dns/events?limit=` | the newest lines of the anchor's own event journal, newest first, as the journal holds them |
+
+A caller presents the session the cluster's auth anchor minted. It verifies here against the key that
+member publishes through gossip, and the person's authority is read on every request from the anchor's
+own copy of the cluster's accounts — a viewer or above is admitted, a disabled account is signed out, and
+a session ended elsewhere is refused from the moment the announcement arrives. An anchor that has not yet
+heard the key, or has no copy of the accounts yet, answers `503` naming the reason rather than `401`.
+The Control Panel's origin is listed in `AllowedOrigins`.
+
+Unknown is never reported as none. A pass that has not run, a host that did not resolve, a collision
+that could not be checked and a certificate issued before anything recorded it are all null.
+
+**The journal** is `/var/lib/kgsm-dns/events/`, in the ecosystem's envelope, and records transitions:
+`dns.name.published`, `.moved`, `.withdrawn`, `.contested`, `.recovered`; `dns.certificate.issued`,
+`.failed`, `.refused`; `dns.zone.unreachable` and `.restored`. A quiet pass writes nothing. Names and
+payloads are the package's (`DnsEvents`, `DnsEventPayloads`).
+
 ## Packages
 
 | package | contents | taken by |
 |---|---|---|
-| **`TheKrystalShip.KGSM.Dns`** | labels, the three bases, the mark a published record carries, the bus messages, and a member's half: stating where it is reached, keeping its names, and keeping a certificate and a served site for each. AOT-safe. | every cluster member |
+| **`TheKrystalShip.KGSM.Dns`** | labels, the three bases, the mark a published record carries, the bus messages, the status document and journal events a reader consumes, and a member's half: stating where it is reached, keeping its names, and keeping a certificate and a served site for each. AOT-safe. | every cluster member |
 
 The deployable is **`kgsm-dns`** (`src/Dns.Anchor`), shipped as a pacman package and a systemd unit.
 

@@ -1,15 +1,22 @@
+using Microsoft.Extensions.Caching.Memory;
+
+using TheKrystalShip.KGSM.Auth.Cluster;
+using TheKrystalShip.KGSM.Auth.Sessions;
 using TheKrystalShip.KGSM.Cluster;
 using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor;
+using TheKrystalShip.KGSM.Dns.Anchor.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
 using TheKrystalShip.KGSM.Dns.Anchor.Providers;
 using TheKrystalShip.KGSM.Dns.Anchor.Acme;
 using TheKrystalShip.KGSM.Dns.Anchor.Issuance;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
+using TheKrystalShip.KGSM.Dns.Anchor.Status;
 using TheKrystalShip.KGSM.Dns.Member;
 using TheKrystalShip.KGSM.Dns.Serving;
+using TheKrystalShip.KGSM.Extensions;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -83,6 +90,13 @@ builder.Services.AddSingleton(sp => new RecordReconciler(
 
 builder.Services.AddSingleton<NamesAnnouncer>();
 
+// What this anchor did, in its own event journal under its state directory, where every reader of the
+// ecosystem's journals finds it by the producer id alone. And what the last zone pass did, held in memory
+// for the status page, since the next pass says it again.
+builder.Services.AddKgsmJournal(DnsJournal.ProducerId, typeof(DnsJournal).Assembly);
+builder.Services.AddSingleton<DnsJournal>();
+builder.Services.AddSingleton<ZonePassLog>();
+
 // The worker is a singleton as well as a hosted service, so the handler below can bring its next zone
 // pass forward when a node says where it is reached.
 builder.Services.AddSingleton<ClusterMembershipWorker>();
@@ -104,6 +118,13 @@ builder.Services.AddSingleton(sp => new AcmeClient(
     options.AcmeAccountKeyPath,
     sp.GetRequiredService<ILogger<AcmeClient>>()));
 builder.Services.AddSingleton<IDns01Solver, ZoneDns01Solver>();
+// Finished orders go in the registry's file, which the registry has already created by the time this
+// opens it.
+builder.Services.AddSingleton(sp =>
+{
+    sp.GetRequiredService<SqliteNameRegistry>();
+    return new CertificateOrders(options.RegistryPath);
+});
 builder.Services.AddSingleton<IssuanceQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IssuanceQueue>());
 builder.Services.AddSingleton<IClusterMessageHandler, CsrHandler>();
@@ -121,7 +142,48 @@ builder.Services.AddSingleton<ICertificateRequester, OwnCertificateRequester>();
 builder.Services.AddSingleton<CertificateKeeper>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>());
 
+// A person's browser reading this anchor's page. It signs in once, at the member holding `auth`; the
+// session verifies here against the key that member publishes, and the person's authority is read from
+// this anchor's own copy of the accounts that member publishes. Every piece is the shared one every member
+// verifies with, and inert outside a cluster: no holder is heard of, no key is learned, and every
+// session is refused as unverifiable.
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<AnchorAccounts>();
+builder.Services.AddSingleton<IReplicatedAccounts>(sp => sp.GetRequiredService<AnchorAccounts>());
+builder.Services.AddSingleton<IClusterMessageHandler, AccountReplicationHandler>();
+builder.Services.AddSingleton<IClusterMessageHandler, AccountRemovalHandler>();
+builder.Services.AddHostedService<AccountSnapshotWorker>();
+
+builder.Services.AddSingleton<ClusterSessionKeys>();
+builder.Services.AddSingleton<IClusterSessionKeys>(sp => sp.GetRequiredService<ClusterSessionKeys>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterSessionKeys>());
+
+// A sign-out elsewhere, announced over the bus, refused here from then on. The record is kept for as long
+// as a session somebody could still present is bounded by, which is the longest a person stays signed in.
+builder.Services.AddSingleton<EndedSessions>();
+builder.Services.AddSingleton<IClusterSessionAuthority>(sp => sp.GetRequiredService<EndedSessions>());
+builder.Services.AddSingleton(sp => new ClusterSessionRevocations(
+    sp.GetRequiredService<IClusterSessionAuthority>(),
+    sp.GetRequiredService<IMemoryCache>(),
+    TimeSpan.FromSeconds(5)));
+builder.Services.AddSingleton<IClusterMessageHandler>(sp => new SessionRevokeHandler(
+    sp.GetRequiredService<IClusterSessionAuthority>(),
+    new NoLocalSessions(),
+    sp.GetRequiredService<ClusterSessionRevocations>(),
+    TimeSpan.FromDays(30),
+    sp.GetRequiredService<ILogger<SessionRevokeHandler>>()));
+
+builder.Services.AddSingleton<ClusterBearer>();
+
+// The Control Panel is served from another origin. Reads only, with a bearer and never a cookie.
+builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
+    .WithOrigins([.. options.AllowedOrigins])
+    .WithMethods("GET")
+    .WithHeaders("Authorization")));
+
 WebApplication app = builder.Build();
+
+app.UseCors();
 
 // The member wire: the inbox other members deliver to, and the handshake a join is performed through.
 // Served by the package rather than spelled out here, so every member answers the same routes.
@@ -129,6 +191,9 @@ app.MapClusterEndpoints();
 
 // A member fetching its own names, for when it cannot yet be reached to be told them.
 app.MapGet(NamesEndpoint.Path, NamesEndpoint.HandleAsync);
+
+// What a person's browser reads: the cluster's names as this anchor holds them, and its journal.
+StatusEndpoints.Map(app);
 
 // What this anchor is. Serialized through the source-generated context, because a Native AOT build has
 // no reflection to fall back on.

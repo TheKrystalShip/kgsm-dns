@@ -5,6 +5,33 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0]
+
+### Added — a person can read what the anchor holds
+
+- **`GET /api/v1/cluster/dns`** answers one `DnsStatus`: this member's standing, the zone's health, every
+  name with its target, state, block reason, declared ports and port collisions, every member with where
+  it said it is reached and what that resolved to, and every certificate order. Answered by the anchor
+  itself, so the page needs no Control Panel API anywhere in the cluster.
+- **`GET /api/v1/cluster/dns/events`** answers the newest lines of the anchor's own journal.
+- **Both are verified against the cluster's session.** The anchor verifies the auth anchor's sessions
+  against its published key, keeps its own copy of the cluster's accounts (snapshot on start, every
+  change after) and reads the caller's tier from it on every request, and records sessions ended
+  elsewhere. A viewer or above is admitted; an anchor that cannot yet verify answers `503`. CORS admits
+  `AllowedOrigins`. New settings: `AllowedOrigins`, `AccountsPath`, `SessionsPath`.
+- **An event journal at `/var/lib/kgsm-dns/events/`**: names published, moved, withdrawn, contested and
+  recovered; certificates issued, failed and refused; the zone becoming unreachable and restored. A pass
+  that fails partway still records what it already changed.
+- **Every certificate order is recorded** when it ends, with the issued certificate's expiry, in the
+  registry's file for 120 days. The issuer's weekly limit is counted against it. Orders finished before
+  this version are not in it.
+- **The last zone pass is kept in memory**: when, how long, whether it succeeded, the provider's error,
+  what it changed and when the next is due.
+- Port collisions resolve every member that stated a host, and this anchor's own, so members sharing a
+  router are visible before either runs a game server.
+- `TheKrystalShip.KGSM.Dns 0.2.0-dev.11`: `DnsStatus` and its parts with `DnsStatusJsonContext`,
+  `DnsStatusRoutes`, `DnsEvents`, `DnsEventPayloads`.
+
 ## [0.9.0]
 
 ### Added — a member removed from the cluster loses its names

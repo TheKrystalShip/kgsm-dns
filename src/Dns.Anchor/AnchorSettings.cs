@@ -172,6 +172,28 @@ internal sealed class AnchorSettings
         Risk = ConfigRisk.Destructive)]
     public string ClusterStorePath { get; set; } = "/var/lib/kgsm-dns/cluster.db";
 
+    /// <summary>Browser origins allowed to read this anchor's status, comma-separated.</summary>
+    /// <panel>The browser origins allowed to read this anchor's page, comma-separated — normally the
+    /// Control Panel's address. The panel is served from a different origin, so without an entry for it
+    /// the browser refuses the answer before the page can read it.</panel>
+    [ConfigField("allowedOrigins", "Allowed browser origins", Group = "access", Type = ConfigType.Csv,
+        Risk = ConfigRisk.Wiring)]
+    public string AllowedOrigins { get; set; } = "";
+
+    /// <summary>Where this anchor keeps its copy of the cluster's accounts.</summary>
+    /// <panel>This anchor's own copy of the cluster's accounts, filled by the member that holds them. It
+    /// is what decides who may read this page, read afresh on every request.</panel>
+    [ConfigField("accountsPath", "Account copy", Group = "storage", Type = ConfigType.Path,
+        Risk = ConfigRisk.Wiring)]
+    public string AccountsPath { get; set; } = "/var/lib/kgsm-dns/accounts.db";
+
+    /// <summary>Where this anchor records sessions ended elsewhere in the cluster.</summary>
+    /// <panel>The sessions somebody signed out of elsewhere in the cluster, kept so this anchor refuses
+    /// them too until they would have expired.</panel>
+    [ConfigField("sessionsPath", "Ended sessions", Group = "storage", Type = ConfigType.Path,
+        Risk = ConfigRisk.Safe)]
+    public string SessionsPath { get; set; } = "/var/lib/kgsm-dns/sessions.db";
+
     /// <summary>Where the descriptor this build wrote is installed.</summary>
     /// <panel>The file describing what this anchor can be configured with, written by its own build and
     /// installed by its deploy. It is read to render this page; absent, there is no page.</panel>

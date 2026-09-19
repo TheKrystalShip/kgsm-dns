@@ -119,10 +119,71 @@ public sealed class ReconcilerTests : IDisposable
 
         RecordReconciler.Pass pass = await _reconciler.RunAsync(CancellationToken.None);
 
-        Assert.Equal(1, pass.Contested);
+        Assert.Equal(1, pass.NewlyContested);
+        Assert.Equal([name], pass.Contested);
         Assert.Equal("192.0.2.99", _provider.Find(name)!.Content);
         Assert.Empty(_provider.Calls);
         Assert.Equal(NameState.Blocked, _registry.Find(name)!.State);
+
+        // Contested once, and still held on every pass after: the name stays on the list for as long as
+        // the record holding it is there, without being contested again.
+        RecordReconciler.Pass next = await _reconciler.RunAsync(CancellationToken.None);
+        Assert.Equal(0, next.NewlyContested);
+        Assert.Equal([name], next.Contested);
+    }
+
+    [Fact]
+    public async Task A_pass_that_fails_partway_keeps_what_it_already_changed()
+    {
+        var names = new NameService(
+            _registry,
+            Bases,
+            new MemberNamePool(["jessie", "walter"], new Dictionary<string, string>()),
+            NullLogger<NameService>.Instance);
+        names.ClaimMember("node-a", "203.0.113.10");
+        names.ClaimMember("node-b", "203.0.113.11");
+
+        _provider.CreatesBeforeOutage = 1;
+        await Assert.ThrowsAsync<DnsProviderException>(() => _reconciler.RunAsync(CancellationToken.None));
+
+        // One record reached the zone before the provider stopped answering. It is there whether or not
+        // the pass finished, so it is handed over rather than lost with the pass.
+        ZoneChange done = Assert.Single(_reconciler.TakeUnreported());
+        Assert.Equal(ZoneChangeKind.Published, done.Kind);
+        Assert.Empty(_reconciler.TakeUnreported());
+
+        _provider.CreatesBeforeOutage = null;
+        RecordReconciler.Pass next = await _reconciler.RunAsync(CancellationToken.None);
+        Assert.Single(next.Changes);
+    }
+
+    [Fact]
+    public async Task A_pass_reports_each_change_with_what_the_name_was()
+    {
+        NameRow row = _names.ClaimMember("node-a", "203.0.113.10");
+        RecordReconciler.Pass first = await _reconciler.RunAsync(CancellationToken.None);
+
+        ZoneChange published = Assert.Single(first.Changes);
+        Assert.Equal(ZoneChangeKind.Published, published.Kind);
+        Assert.Equal(row.Name, published.Name);
+        Assert.Equal("node-a", published.Member);
+
+        _names.Retarget(_registry.Find(row.Name)!, "203.0.113.20");
+        RecordReconciler.Pass second = await _reconciler.RunAsync(CancellationToken.None);
+
+        ZoneChange moved = Assert.Single(second.Changes);
+        Assert.Equal(ZoneChangeKind.Moved, moved.Kind);
+        Assert.Equal("203.0.113.10", moved.From);
+        Assert.Equal("203.0.113.20", moved.Content);
+
+        // Released, so the row is gone: what the name was is read off the record's mark.
+        _names.Release(row.Name);
+        RecordReconciler.Pass third = await _reconciler.RunAsync(CancellationToken.None);
+
+        ZoneChange withdrawn = Assert.Single(third.Changes);
+        Assert.Equal(ZoneChangeKind.Withdrawn, withdrawn.Kind);
+        Assert.Equal(NameKind.Member, withdrawn.NameKind);
+        Assert.Equal("node-a", withdrawn.Member);
     }
 
     [Fact]
