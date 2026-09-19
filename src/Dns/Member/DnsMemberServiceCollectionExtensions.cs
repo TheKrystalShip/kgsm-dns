@@ -67,6 +67,8 @@ public static class DnsMemberServiceCollectionExtensions
         services.AddSingleton<DnsSelfAddresses>();
         services.AddSingleton<ISelfAddressSource>(sp => sp.GetRequiredService<DnsSelfAddresses>());
 
+        services.AddHttpClient(DnsNamesFetcher.ClientName, c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddSingleton<DnsNamesFetcher>();
         services.AddSingleton<IClusterMessageHandler, DnsNamesHandler>();
         services.AddSingleton<IClusterMessageHandler, DnsCertHandler>();
         services.AddHostedService<DnsSelfWorker>();

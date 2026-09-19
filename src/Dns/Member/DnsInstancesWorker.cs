@@ -32,15 +32,17 @@ public interface IDnsInstanceSource
 /// </para>
 /// <para>
 /// <b>Level-triggered.</b> The source is read every few seconds and the set is sent when it differs from
-/// what was last sent, when the holder of <c>dns</c> changes, and on a slow refresh regardless — so an
-/// install made while this process was stopped, a message the bus lost and an anchor that lost its
-/// registry all converge without any of them being noticed.
+/// what was last sent, when the holder of <c>dns</c> changes, when this member's incarnation rises, and on
+/// a slow refresh regardless — so an install made while this process was stopped, a message the bus lost,
+/// an anchor that lost its registry and a node that refuted its removal after its names were released
+/// all converge without any of them being noticed.
 /// </para>
 /// </remarks>
 public sealed class DnsInstancesWorker(
     ClusterOptions cluster,
     ClusterStateStore state,
     MembersStore members,
+    SelfIncarnation incarnation,
     IClusterBus bus,
     IDnsInstanceSource source,
     DnsMemberOptions options,
@@ -50,6 +52,7 @@ public sealed class DnsInstancesWorker(
 
     private string? _sentTo;
     private string? _sentSet;
+    private long _sentAt = -1;
     private DateTimeOffset _nextRefresh = DateTimeOffset.MinValue;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -80,7 +83,7 @@ public sealed class DnsInstancesWorker(
         }
     }
 
-    private async Task StateAsync(CancellationToken ct)
+    internal async Task StateAsync(CancellationToken ct)
     {
         string? holder = await state.HolderAsync(DnsCapability.Name, ct).ConfigureAwait(false);
         if (string.IsNullOrEmpty(holder) || string.Equals(holder, cluster.MemberId, StringComparison.Ordinal))
@@ -99,10 +102,11 @@ public sealed class DnsInstancesWorker(
         string set = Fingerprint(ordered);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        long current = incarnation.Current;
         bool changed = !string.Equals(_sentTo, holder, StringComparison.Ordinal)
             || !string.Equals(_sentSet, set, StringComparison.Ordinal);
 
-        if (!changed && now < _nextRefresh)
+        if (!changed && current == _sentAt && now < _nextRefresh)
             return;
 
         await bus.EnqueueAsync(
@@ -117,6 +121,7 @@ public sealed class DnsInstancesWorker(
 
         _sentTo = holder;
         _sentSet = set;
+        _sentAt = current;
         _nextRefresh = now + options.Refresh;
     }
 

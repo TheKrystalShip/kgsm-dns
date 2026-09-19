@@ -78,6 +78,10 @@ public sealed class SqliteNameRegistry
                 host       TEXT NOT NULL,
                 stated_at  TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS departures (
+                member      TEXT PRIMARY KEY,
+                incarnation INTEGER NOT NULL
+            );
             """;
         cmd.ExecuteNonQuery();
     }
@@ -267,6 +271,53 @@ public sealed class SqliteNameRegistry
             cmd.Parameters.AddWithValue(
                 "$stated_at", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// The removal of a member whose names were released, as the incarnation its <c>left</c> row carried,
+    /// or <see langword="null"/> when none has been acted on.
+    /// </summary>
+    public long? DepartureActedOn(string member)
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT incarnation FROM departures WHERE member = $member";
+        cmd.Parameters.AddWithValue("$member", member);
+        return cmd.ExecuteScalar() is long incarnation ? incarnation : null;
+    }
+
+    /// <summary>Record that one removal of a member has been acted on.</summary>
+    public void ActOnDeparture(string member, long incarnation)
+    {
+        lock (_writeGate)
+        {
+            using SqliteConnection connection = Open();
+            using SqliteCommand cmd = connection.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO departures (member, incarnation) VALUES ($member, $incarnation)
+                ON CONFLICT(member) DO UPDATE SET incarnation = excluded.incarnation
+                """;
+            cmd.Parameters.AddWithValue("$member", member);
+            cmd.Parameters.AddWithValue("$incarnation", incarnation);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Forget where a member said it is reached, so it reads as never having said.
+    /// </summary>
+    /// <returns>Whether there was a statement to forget.</returns>
+    public bool ForgetHost(string member)
+    {
+        lock (_writeGate)
+        {
+            using SqliteConnection connection = Open();
+            using SqliteCommand cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM hosts WHERE member = $member";
+            cmd.Parameters.AddWithValue("$member", member);
+            return cmd.ExecuteNonQuery() > 0;
         }
     }
 

@@ -5,6 +5,40 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0]
+
+### Added — a member removed from the cluster loses its names
+
+A member removed from the cluster is marked `left` in the roster. Once that row has stood for the settle
+window — three minutes, or half the time a departed row is held if that is shorter — the anchor releases
+the member's node name, its game names and any capability name following it, and forgets the host it
+stated; the next zone pass withdraws the records.
+
+- **Offline is not departed.** A dead member, and one reaped from the roster, keeps every name.
+- **A refuted removal releases nothing.** A running member overturns its removal — measured at just over
+  a minute — inside the settle window. One slower than that has its names released and states itself
+  again the moment its incarnation rises: `TheKrystalShip.KGSM.Dns 0.2.0-dev.8` restates where a member
+  is reached, and a node's game servers, on every rise.
+- **Released once per removal**, recorded durably by the incarnation the `left` row carried, so a later
+  tick or a restart does not release again. A member that comes back states itself and is named again
+  at once, a pinned node under its pin, whether or not its refutation has arrived; a later removal
+  carries a higher incarnation and is acted on.
+- **A capability still assigned to it is withdrawn** rather than left pointing at a machine that is gone.
+- **A member asks for its names as well as being told them.** The anchor's answer travels to a name
+  the member serves, so a member serving none — one named again after a removal, or a node that has
+  just joined — could never hear it. `GET /api/v1/dns/names` answers an authenticated member with its
+  own names once it has said where it is reached, and a `409` before then, which the member treats as
+  "not yet" and never as "none". The member asks for a minute after every statement, while the anchor
+  has not answered and while a name waits for its record, and on the slow refresh otherwise
+  (`TheKrystalShip.KGSM.Dns 0.2.0-dev.10`: `DnsRoutes`, `DnsNamesFetcher`).
+- **A member serves a name waiting for its record.** The anchor answers a member that has just stated
+  itself before the zone pass writes the record, and `IServedNames.Held` — published or pending — is what
+  the site serves, while a certificate is asked for only once a name is published. A returning member
+  keeps serving its name through that gap rather than withdrawing its site (`TheKrystalShip.KGSM.Dns
+  0.2.0-dev.9`).
+- Takes `TheKrystalShip.KGSM.Cluster 1.0.0-dev.21`, which holds a `left` row for seven days, so an anchor
+  that was down when the removal was made still sees it when it returns.
+
 ## [0.8.0]
 
 ### Added — a member is advertised at the names it serves

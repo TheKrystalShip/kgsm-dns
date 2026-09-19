@@ -3,6 +3,18 @@ using System.Text.Json.Serialization;
 
 namespace TheKrystalShip.KGSM.Dns.Messages;
 
+/// <summary>The route a member fetches its own names from, on the member holding <c>dns</c>.</summary>
+/// <remarks>
+/// It answers with the same <see cref="DnsNames"/> the anchor pushes, and only once the caller has said
+/// where it is reached: a member that has not been heard from yet holds nothing, and an empty answer then
+/// would read as a verdict.
+/// </remarks>
+public static class DnsRoutes
+{
+    /// <summary>The path, answered on the holder's own address.</summary>
+    public const string Names = "/api/v1/dns/names";
+}
+
 /// <summary>The bus message types this component speaks.</summary>
 public static class DnsMessageTypes
 {

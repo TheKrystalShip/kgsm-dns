@@ -40,6 +40,14 @@ public sealed class DnsNamesHandler(
             return;
         }
 
+        Keep(book, keeper, logger, names);
+    }
+
+    /// <summary>
+    /// Keep what the anchor said, however it arrived — pushed on the bus or fetched by this member.
+    /// </summary>
+    internal static void Keep(DnsNameBook book, Serving.CertificateKeeper keeper, ILogger logger, DnsNames names)
+    {
         string before = string.Join(", ", book.Published.Order(StringComparer.Ordinal));
         book.Replace(names.Names);
         string now = string.Join(", ", book.Published.Order(StringComparer.Ordinal));

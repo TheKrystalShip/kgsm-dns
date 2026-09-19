@@ -35,26 +35,30 @@ public sealed class NamesAnnouncer(
             return false;
         }
 
-        List<DnsNameEntry> names =
-        [
-            .. registry.ForMember(memberId).Select(n => new DnsNameEntry(
-                Name: n.Name,
-                Kind: NameKinds.Spell(n.Kind),
-                Key: n.Key,
-                State: Spell(n.State),
-                Note: n.Note,
-                Collisions: n.Kind == NameKind.Game ? collisions.For(n.Name) : null)),
-        ];
-
         await bus.EnqueueAsync(
             DnsMessageTypes.Names,
-            new DnsNames(names),
+            NamesOf(memberId),
             DnsJsonContext.Default.DnsNames,
             [new ClusterTarget(row.MemberId, row.Url)],
             ct).ConfigureAwait(false);
 
         return true;
     }
+
+    /// <summary>
+    /// Every name the registry holds for one member, as the member is told them — pushed on the bus, or
+    /// fetched by the member itself.
+    /// </summary>
+    public DnsNames NamesOf(string memberId) => new(
+    [
+        .. registry.ForMember(memberId).Select(n => new DnsNameEntry(
+            Name: n.Name,
+            Kind: NameKinds.Spell(n.Kind),
+            Key: n.Key,
+            State: Spell(n.State),
+            Note: n.Note,
+            Collisions: n.Kind == NameKind.Game ? collisions.For(n.Name) : null)),
+    ]);
 
     private static string Spell(NameState state) => state switch
     {

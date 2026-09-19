@@ -32,6 +32,7 @@ internal sealed class ClusterMembershipWorker(
     ClusterStateStore state,
     NameService names,
     CapabilityNames capabilities,
+    Departures departures,
     PortCollisions collisions,
     RecordReconciler reconciler,
     SqliteNameRegistry registry,
@@ -93,11 +94,15 @@ internal sealed class ClusterMembershipWorker(
         //
         // Game names follow their node's own name the same way: a node whose name was drawn, blocked or
         // published since its servers were named has them brought to match.
+        //
+        // A member removed from the cluster goes first, so a capability still assigned to it is re-derived
+        // on this same tick as moving to a holder that has not spoken, and withdrawn.
+        bool departed = (await departures.SweepAsync(options.MemberId, ct).ConfigureAwait(false)).Count > 0;
         var touched = new HashSet<string>(
             await capabilities.SyncAsync(options.MemberId, options.PublicHost, ct).ConfigureAwait(false),
             StringComparer.Ordinal);
         touched.UnionWith(names.RetargetGames());
-        if (touched.Count > 0)
+        if (touched.Count > 0 || departed)
             RequestZonePass();
 
         // An anchor holds no node name — it is reached by what it serves — so one found under this

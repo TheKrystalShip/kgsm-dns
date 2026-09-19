@@ -14,7 +14,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns.Anchor</RootNamespace>
     <AssemblyName>kgsm-dns</AssemblyName>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
 
     <!-- The config descriptor is generated from AnchorSettings by TheKrystalShip.KGSM.ComponentConfig.
          These name the two files it works between; the attribute source, the documentation file the
@@ -40,7 +40,7 @@
   <ItemGroup>
     <!-- Cluster membership and durable member-to-member messaging. This anchor is a member like any
          other: it joins directly, answers the same wire, and needs no kgsm-api to do it. -->
-    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.20" />
+    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0-dev.21" />
 
     <!-- The registry, on the daemon's own file. -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />

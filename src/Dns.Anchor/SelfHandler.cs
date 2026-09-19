@@ -66,7 +66,6 @@ internal sealed class SelfHandler(
             logger.LogInformation("{From} is not a member this anchor knows of — ignored", envelope.From);
             return;
         }
-
         // A claim waits for the registry to have been read against the zone, for the same reason the
         // worker's own claims do: against an unread registry a node the zone already names would draw a
         // second name. A zone that cannot be read yet leaves the statement for the node's next one.

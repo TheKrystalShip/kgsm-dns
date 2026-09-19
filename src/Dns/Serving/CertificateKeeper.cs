@@ -15,8 +15,16 @@ public interface ICertificateRequester
 /// <summary>The names this member should be serving, as the anchor last said.</summary>
 public interface IServedNames
 {
-    /// <summary>Every name the anchor reports published for this member.</summary>
+    /// <summary>Every name the anchor reports published for this member: what a certificate is asked for.</summary>
     IReadOnlyList<string> Published { get; }
+
+    /// <summary>
+    /// Every name the anchor reports this member holds, published or waiting for its record: what is
+    /// served. A name waiting for its record is still this member's — the anchor answers a member that has
+    /// just stated itself before the zone pass writes the record — and dropping it from the site would take
+    /// the member offline for as long as the record takes.
+    /// </summary>
+    IReadOnlyList<string> Held { get; }
 
     /// <summary>
     /// Whether the anchor has said which names this member holds. Until it has, an empty set means not
@@ -112,7 +120,8 @@ public sealed class CertificateKeeper(
         // and acting on it would take every name offline until the anchor next speaks. A member that holds
         // nothing and serves nothing has nothing to do.
         IReadOnlyList<string> published = names.Published;
-        if (published.Count == 0 && (!names.Answered || !site.Serving))
+        IReadOnlyList<string> held = names.Held;
+        if (held.Count == 0 && (!names.Answered || !site.Serving))
             return;
 
         // A host nobody provisioned to serve generated sites keeps its names and serves them however
@@ -147,6 +156,6 @@ public sealed class CertificateKeeper(
             logger.LogInformation("asked for a certificate for {Name}", name);
         }
 
-        await site.ServeAsync(published, ct).ConfigureAwait(false);
+        await site.ServeAsync(held, ct).ConfigureAwait(false);
     }
 }

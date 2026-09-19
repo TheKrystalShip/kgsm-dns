@@ -30,6 +30,12 @@ public sealed class DnsNameBook : Serving.IServedNames
                 && (n.Kind == NameKinds.Spell(NameKind.Member) || n.Kind == NameKinds.Spell(NameKind.Capability)))
             .Select(n => n.Name)];
 
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Held =>
+        [.. _names.Where(n => (n.Published || string.Equals(n.State, "pending", StringComparison.Ordinal))
+                && (n.Kind == NameKinds.Spell(NameKind.Member) || n.Kind == NameKinds.Spell(NameKind.Capability)))
+            .Select(n => n.Name)];
+
     /// <summary>When the anchor last told this member anything, or null if it never has.</summary>
     public DateTimeOffset? ReceivedAt { get; private set; }
 

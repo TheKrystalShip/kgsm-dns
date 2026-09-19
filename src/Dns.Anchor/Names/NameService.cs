@@ -282,6 +282,29 @@ public sealed class NameService(
     public IReadOnlyList<NameRow> Held(string member) => registry.ForMember(member);
 
     /// <summary>
+    /// Give up every name one member holds — its node name, its game names and any capability name
+    /// following it. The records go with them on the next reconcile.
+    /// </summary>
+    /// <returns>The names released.</returns>
+    public IReadOnlyList<string> ReleaseAll(string member)
+    {
+        var released = new List<string>();
+        lock (_gate)
+        {
+            foreach (NameRow row in registry.ForMember(member))
+            {
+                registry.Remove(row.Name);
+                released.Add(row.Name);
+            }
+        }
+
+        foreach (string name in released)
+            logger.LogInformation("released {Name}", name);
+
+        return released;
+    }
+
+    /// <summary>
     /// Give up one name. The record goes with it on the next reconcile.
     /// </summary>
     public void Release(string name)

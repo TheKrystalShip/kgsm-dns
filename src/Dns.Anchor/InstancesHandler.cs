@@ -59,7 +59,6 @@ internal sealed class InstancesHandler(
             logger.LogInformation("{From} is not a node this anchor knows of — it holds no game names", envelope.From);
             return;
         }
-
         // The same wait every claim makes: against an unread registry a server the zone already names would
         // draw a second name. The node repeats the set, so a zone that cannot be read yet loses nothing.
         try

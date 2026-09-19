@@ -61,6 +61,7 @@ builder.Services.AddKgsmCluster(clusterOptions);
 builder.Services.AddSingleton(_ => new SqliteNameRegistry(options.RegistryPath));
 builder.Services.AddSingleton<NameService>();
 builder.Services.AddSingleton<CapabilityNames>();
+builder.Services.AddSingleton<Departures>();
 builder.Services.AddSingleton<IHostResolver, SystemHostResolver>();
 builder.Services.AddSingleton<PortCollisions>();
 
@@ -125,6 +126,9 @@ WebApplication app = builder.Build();
 // The member wire: the inbox other members deliver to, and the handshake a join is performed through.
 // Served by the package rather than spelled out here, so every member answers the same routes.
 app.MapClusterEndpoints();
+
+// A member fetching its own names, for when it cannot yet be reached to be told them.
+app.MapGet(NamesEndpoint.Path, NamesEndpoint.HandleAsync);
 
 // What this anchor is. Serialized through the source-generated context, because a Native AOT build has
 // no reflection to fall back on.
