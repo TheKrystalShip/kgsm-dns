@@ -5,6 +5,26 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0]
+
+### Changed — a name and a certificate say what happened, and how much it matters
+
+Every line this anchor records carries the three fields a reader renders from: the weight
+(`info｜warn｜danger`), how it went, and one sentence of prose written as the fact is recorded. A name
+freezes into that sentence as it was spelled then, so a later move leaves the earlier line still saying
+where the name went at the time.
+
+The weights follow what a change does to whoever holds the name. Publishing, correcting and recovering
+a name leave it reachable and are the routine good news a pass exists for; a name leaving the zone or
+held away from it stops resolving for everyone, and an alias given up takes somebody's bookmark with
+it. An order that ends without a certificate is `warn`, because the member asks again and the name
+keeps the certificate it already holds. The zone not answering is the one `danger`: no name can be
+written and no certificate ordered behind it.
+
+`DnsJournalTests` asserts the producer's own half — every method writes all three fields, every
+declared name is lowercase, dotted and under `dns.`, and each change carries the weight its effect
+deserves.
+
 ## [0.12.0]
 
 ### Added — a member renews a certificate when an admin asks

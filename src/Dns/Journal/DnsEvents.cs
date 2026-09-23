@@ -65,8 +65,10 @@ public static class DnsEvents
 /// The bytes each <see cref="DnsEvents"/> event carries.
 /// </summary>
 /// <remarks>
-/// Facts, not sentences: no summary and no severity, which are a reader's to build. An absent value is a
-/// real null rather than an empty string, because "not known" and "blank" are different facts.
+/// The typed half of a line: what the event is about, for a reader that wants the values rather than the
+/// sentence. The sentence, the weight and how it went ride the envelope beside them, written by the
+/// anchor at the moment it records the fact. An absent value here is a real null rather than an empty
+/// string, because "not known" and "blank" are different facts.
 /// </remarks>
 public static class DnsEventPayloads
 {
