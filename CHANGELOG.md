@@ -5,6 +5,15 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1]
+
+### Changed — the anchor's cluster state belongs to one cluster
+
+Takes `TheKrystalShip.KGSM.Cluster 1.0.0-dev.22`: started with a different cluster secret, the anchor
+discards the roster, the capability assignments and the queued messages it learned in the old cluster
+before anything reads them, so a machine moving to another cluster never gossips its old `dns`
+assignment into the new one.
+
 ## [0.13.0]
 
 ### Changed — a name and a certificate say what happened, and how much it matters
