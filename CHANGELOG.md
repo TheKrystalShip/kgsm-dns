@@ -5,6 +5,13 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2]
+
+### Fixed — a fact this anchor changes across a restart reaches the cluster
+
+Takes `TheKrystalShip.KGSM.Cluster 1.0.0-dev.23`: a restart that re-publishes as many facts as before, one
+of them different, no longer lands level with the incarnation other members hold and goes unheard.
+
 ## [0.13.1]
 
 ### Changed — the anchor's cluster state belongs to one cluster
