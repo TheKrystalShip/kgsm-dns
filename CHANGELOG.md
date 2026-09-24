@@ -5,6 +5,16 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.3]
+
+### Changed — the auth packages match the roles
+
+Takes `TheKrystalShip.KGSM.Auth 4.0.0-dev.2`, `Auth.Users 1.4.0-dev.7`, `Auth.Cluster 1.0.0-dev.8` and
+`TheKrystalShip.KGSM.Cluster 1.0.0-dev.24`, and no longer `Auth.Sessions`. `ClusterBearer` verifies
+through `ClusterSessionValidation.Accepting(keys)` alone, with no throwaway symmetric half beside it;
+`EndedSessions` is an `IClusterSessionDenyList`, and the no-op `NoLocalSessions` goes with the handler
+argument it filled. No behaviour changes.
+
 ## [0.13.2]
 
 ### Fixed — a fact this anchor changes across a restart reaches the cluster

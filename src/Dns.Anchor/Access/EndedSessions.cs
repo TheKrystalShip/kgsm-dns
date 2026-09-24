@@ -3,7 +3,6 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Sessions;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 
@@ -18,11 +17,10 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 /// refusal here. Kept on disk so a restart does not accept again a bearer that was already ended.
 /// </para>
 /// <para>
-/// Ending "every session of one person" names sessions a member minted itself, which is none here: a
-/// person switched off entirely is refused by the account copy instead, on their next request.
+/// A person switched off entirely is refused by the account copy instead, on their next request.
 /// </para>
 /// </remarks>
-internal sealed class EndedSessions : IClusterSessionAuthority
+internal sealed class EndedSessions : IClusterSessionDenyList
 {
     private readonly string _connectionString;
     private readonly Lock _writeGate = new();
@@ -86,14 +84,6 @@ internal sealed class EndedSessions : IClusterSessionAuthority
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
-    /// <remarks>A session this anchor did not mint has no row of its own to end; the record above does it.</remarks>
-    public Task RevokeAsync(string sessionId, CancellationToken ct = default) => Task.CompletedTask;
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<string>> RevokeAllForHandleAsync(string handle, CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<string>>([]);
-
     private SqliteConnection Open()
     {
         var connection = new SqliteConnection(_connectionString);
@@ -103,19 +93,4 @@ internal sealed class EndedSessions : IClusterSessionAuthority
 
     private static string Spell(DateTimeOffset at) =>
         at.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-}
-
-/// <summary>
-/// The session validator the shared revoke handler evicts from — which, on a member that mints no
-/// sessions, has nothing cached to evict and no session of its own to call valid.
-/// </summary>
-internal sealed class NoLocalSessions : ISessionValidator
-{
-    /// <inheritdoc />
-    public Task<bool> IsValidAsync(string sessionId, CancellationToken ct = default) => Task.FromResult(false);
-
-    /// <inheritdoc />
-    public void Evict(string sessionId)
-    {
-    }
 }

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 
 using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Sessions;
 using TheKrystalShip.KGSM.Cluster;
 using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
@@ -161,14 +160,13 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterSessionKeys
 // A sign-out elsewhere, announced over the bus, refused here from then on. The record is kept for as long
 // as a session somebody could still present is bounded by, which is the longest a person stays signed in.
 builder.Services.AddSingleton<EndedSessions>();
-builder.Services.AddSingleton<IClusterSessionAuthority>(sp => sp.GetRequiredService<EndedSessions>());
+builder.Services.AddSingleton<IClusterSessionDenyList>(sp => sp.GetRequiredService<EndedSessions>());
 builder.Services.AddSingleton(sp => new ClusterSessionRevocations(
-    sp.GetRequiredService<IClusterSessionAuthority>(),
+    sp.GetRequiredService<IClusterSessionDenyList>(),
     sp.GetRequiredService<IMemoryCache>(),
     TimeSpan.FromSeconds(5)));
 builder.Services.AddSingleton<IClusterMessageHandler>(sp => new SessionRevokeHandler(
-    sp.GetRequiredService<IClusterSessionAuthority>(),
-    new NoLocalSessions(),
+    sp.GetRequiredService<IClusterSessionDenyList>(),
     sp.GetRequiredService<ClusterSessionRevocations>(),
     TimeSpan.FromDays(30),
     sp.GetRequiredService<ILogger<SessionRevokeHandler>>()));

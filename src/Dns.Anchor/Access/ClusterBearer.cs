@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -7,7 +6,6 @@ using Microsoft.IdentityModel.Tokens;
 
 using TheKrystalShip.KGSM.Auth;
 using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Sessions;
 using TheKrystalShip.KGSM.Auth.Users;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
@@ -22,9 +20,8 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 /// and this anchor is needed, so the page stands in a cluster whose nodes run no Control Panel API.
 /// </para>
 /// <para>
-/// <b>Only a cluster session is accepted.</b> The shared validation takes this surface's own sessions and
-/// its cluster's; this anchor mints none, so its own half is a key generated at start and used to sign
-/// nothing — no token can be presented that verifies against it.
+/// <b>Only a cluster session is accepted.</b> It is verified against the key, audience and issuer the
+/// holder of <c>auth</c> publishes, and this anchor holds nothing that could sign one.
 /// </para>
 /// <para>
 /// <b>Authority is the account copy's, read on this request.</b> The tier the session was minted with is
@@ -41,24 +38,9 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 internal sealed class ClusterBearer(
     IClusterSessionKeys keys,
     ClusterSessionRevocations revocations,
-    AnchorAccounts accounts,
-    AnchorOptions options)
+    AnchorAccounts accounts)
 {
     private static readonly JsonWebTokenHandler Handler = new();
-
-    private readonly TokenValidationParameters _ownHalf = new()
-    {
-        ValidateIssuer = true,
-        ValidIssuer = "kgsm-dns:" + options.MemberId,
-        ValidateAudience = true,
-        ValidAudience = "kgsm-dns:" + options.MemberId,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)),
-        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromSeconds(30),
-        NameClaimType = "sub",
-    };
 
     /// <summary>The least a person must hold to read this anchor's pages.</summary>
     public const KgsmTier Minimum = KgsmTier.Viewer;
@@ -98,7 +80,7 @@ internal sealed class ClusterBearer(
         }
 
         TokenValidationResult result = await Handler
-            .ValidateTokenAsync(token, ClusterSessionValidation.Accepting(_ownHalf, keys))
+            .ValidateTokenAsync(token, ClusterSessionValidation.Accepting(keys))
             .ConfigureAwait(false);
         if (!result.IsValid || result.ClaimsIdentity is not ClaimsIdentity claims)
             return new Admission(Results.Unauthorized(), null);

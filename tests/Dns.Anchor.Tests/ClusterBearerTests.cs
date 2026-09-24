@@ -10,7 +10,6 @@ using Microsoft.IdentityModel.Tokens;
 
 using TheKrystalShip.KGSM.Auth;
 using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Sessions;
 using TheKrystalShip.KGSM.Auth.Users;
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
 
@@ -51,7 +50,7 @@ public sealed class ClusterBearerTests : IDisposable
 
         var revocations = new ClusterSessionRevocations(
             _ended, new MemoryCache(Options.Create(new MemoryCacheOptions())), TimeSpan.FromMilliseconds(1));
-        _bearer = new ClusterBearer(_keys, revocations, _accounts, options);
+        _bearer = new ClusterBearer(_keys, revocations, _accounts);
     }
 
     [Fact]
