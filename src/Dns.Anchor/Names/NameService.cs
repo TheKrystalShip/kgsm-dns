@@ -194,6 +194,95 @@ public sealed class NameService(
     }
 
     /// <summary>
+    /// Name a capability under an additional label directly under the zone. The record points where the
+    /// capability's own name does, at its holder's public host, and follows the capability to whichever
+    /// member holds it next.
+    /// </summary>
+    /// <remarks>
+    /// The alias outlives any one holder: it is the administrator's name for the capability, not for the
+    /// member serving it now, so a capability nobody holds leaves it blocked rather than released.
+    /// </remarks>
+    /// <param name="name">The alias's own fully qualified name, already composed and validated.</param>
+    /// <param name="capability">The capability it names.</param>
+    /// <returns>The row, or <see langword="null"/> when the name is already held by something.</returns>
+    public NameRow? ClaimCapabilityAlias(string name, string capability)
+    {
+        lock (_gate)
+        {
+            if (registry.Find(name) is not null)
+                return null;
+
+            NameRow row = Save(CapabilityAliasRow(name, capability, previousMember: ""));
+            logger.LogInformation("{Name} is an alias of the {Capability} capability", name, capability);
+            return row;
+        }
+    }
+
+    /// <summary>
+    /// Bring every capability alias to where its capability's own name stands: the same holder, the same
+    /// target, blocked for the same reason.
+    /// </summary>
+    /// <returns>The members whose aliases changed, including one an alias moved away from.</returns>
+    public IReadOnlySet<string> RetargetCapabilityAliases()
+    {
+        var touched = new HashSet<string>(StringComparer.Ordinal);
+        lock (_gate)
+        {
+            foreach (NameRow row in registry.OfKind(NameKind.CapabilityAlias))
+            {
+                NameRow wanted = CapabilityAliasRow(row.Name, row.Key, row.Member) with { RecordId = row.RecordId };
+
+                bool same = string.Equals(wanted.Member, row.Member, StringComparison.Ordinal)
+                    && string.Equals(wanted.Type, row.Type, StringComparison.Ordinal)
+                    && string.Equals(wanted.Content, row.Content, StringComparison.Ordinal)
+                    && (wanted.State == NameState.Blocked) == (row.State == NameState.Blocked);
+                if (same)
+                    continue;
+
+                Save(wanted);
+                if (row.Member.Length > 0)
+                    touched.Add(row.Member);
+                if (wanted.Member.Length > 0)
+                    touched.Add(wanted.Member);
+            }
+        }
+
+        return touched;
+    }
+
+    /// <summary>
+    /// The row a capability alias should be, given where the capability's own name stands.
+    /// </summary>
+    /// <remarks>
+    /// The target is copied from the capability's row rather than pointing at the capability's name, so
+    /// the alias resolves straight to the holder and the anchors base appears nowhere in what a person
+    /// looks up. A capability nobody holds keeps the alias with the member that last served it, blocked,
+    /// so its record is withdrawn and the member is told it no longer serves the name.
+    /// </remarks>
+    private NameRow CapabilityAliasRow(string name, string capability, string previousMember)
+    {
+        NameRow? held = registry.OfKind(NameKind.Capability)
+            .FirstOrDefault(r => string.Equals(r.Key, capability, StringComparison.Ordinal));
+
+        string? reason = held is null ? "nobody holds the " + capability + " capability"
+            : held.State == NameState.Blocked ? "the capability's own name is not published: " + held.Note
+            : string.IsNullOrEmpty(held.Content) ? "the capability's own name points nowhere yet"
+            : null;
+
+        return new NameRow(
+            Name: name,
+            Kind: NameKind.CapabilityAlias,
+            Member: held?.Member ?? previousMember,
+            Key: capability,
+            Type: reason is null ? held!.Type : "CNAME",
+            Content: reason is null ? held!.Content : "",
+            State: reason is null ? NameState.Pending : NameState.Blocked,
+            RecordId: "",
+            Note: reason ?? "",
+            UpdatedAt: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
     /// Give up every game name and alias a node holds for an instance it no longer has.
     /// </summary>
     /// <param name="member">The node.</param>
@@ -305,7 +394,9 @@ public sealed class NameService(
 
     /// <summary>
     /// Give up every name one member holds — its node name, its game names and any capability name
-    /// following it. The records go with them on the next reconcile.
+    /// following it. The records go with them on the next reconcile. A capability alias is the
+    /// administrator's name for the capability rather than for this member, so it stays, and follows the
+    /// capability on the next pass.
     /// </summary>
     /// <returns>The names released.</returns>
     public IReadOnlyList<string> ReleaseAll(string member)
@@ -313,7 +404,7 @@ public sealed class NameService(
         var released = new List<string>();
         lock (_gate)
         {
-            foreach (NameRow row in registry.ForMember(member))
+            foreach (NameRow row in registry.ForMember(member).Where(r => r.Kind != NameKind.CapabilityAlias))
             {
                 registry.Remove(row.Name);
                 released.Add(row.Name);

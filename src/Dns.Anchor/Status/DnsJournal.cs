@@ -189,6 +189,7 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
         NameKind.Capability => "capability",
         NameKind.Game => "game",
         NameKind.Alias => "alias",
+        NameKind.CapabilityAlias => "capability alias",
         _ => "",
     };
 

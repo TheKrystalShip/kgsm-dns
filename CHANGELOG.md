@@ -5,6 +5,31 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0]
+
+### Added — an administrator can name a capability at the top of the zone (package 0.2.0-dev.15)
+
+- **`NameKind.CapabilityAlias`** (`capability-alias`): one label directly under the zone, such as
+  `assistant.example.com`, naming a capability. `POST /api/v1/cluster/dns/aliases` with a capability's
+  name as `server` claims one; `DELETE` on it releases it. A label naming one of the three bases is
+  refused.
+- **It points where the capability's own name does** — the holder's public host, copied from the
+  capability's row, so the anchors base appears nowhere a person looks up. It follows the capability to
+  each new holder on the pass that moves the capability's name, is blocked and withdrawn while nobody
+  holds the capability, and survives its holder leaving the cluster.
+- **It takes a certificate and is served.** `NameKinds.TakesCertificate` covers it, so the holder's name
+  book serves it, asks for its certificate and writes it into the generated site beside the capability
+  name; the DNS anchor serves an alias of its own capability the same way. `DnsSelfAddresses` orders a
+  node name, then capability names, then aliases, so the address the cluster hands out for a member is
+  never an alias.
+- **Containment at the top of the zone is the mark.** `ClusterBases.Owns` stays the three bases, so a
+  member may still state a hand-made name at the top of the zone as its public host.
+  `ClusterBases.HoldsAlias` recognises the shape, and the reconciler counts such a record as the
+  cluster's only when it carries a `capability-alias` mark; the DNS-01 solver answers for one only when
+  the registry holds it as an alias. A hand-made record already on the label contests the alias and is
+  never touched.
+- **Status:** `aliasOf` names the capability's own name for a capability alias.
+
 ## [0.13.3]
 
 ### Changed — the auth packages match the roles

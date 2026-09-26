@@ -29,10 +29,11 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Status;
 /// with a body naming why before touching the registry, the zone or a member.
 /// </para>
 /// <para>
-/// <b>Nothing here points a name anywhere new.</b> An alias is claimed at the same node its server
-/// already resolves to, through <see cref="NameService.ClaimAlias"/>, which is the same entitlement the
-/// zone pass enforces for every other name; a renewal asks a member for a certificate it already holds
-/// published, never a new one.
+/// <b>Nothing here points a name anywhere new.</b> A game server's alias is claimed at the same node its
+/// server already resolves to, through <see cref="NameService.ClaimAlias"/>, and a capability's alias at
+/// the same holder its capability name does, through <see cref="NameService.ClaimCapabilityAlias"/> —
+/// the same entitlement the zone pass enforces for every other name. A renewal asks a member for a
+/// certificate it already holds published, never a new one.
 /// </para>
 /// </remarks>
 internal static class AdminEndpoints
@@ -144,11 +145,30 @@ internal static class AdminEndpoints
 
         SqliteNameRegistry registry = services.GetRequiredService<SqliteNameRegistry>();
         NameRow? server = registry.Find(request.Server.Trim().TrimEnd('.').ToLowerInvariant());
-        if (server is null || server.Kind != NameKind.Game)
-            return NotFoundError("no_such_server", request.Server + " is not a game server this cluster names");
+        if (server is null || server.Kind is not (NameKind.Game or NameKind.Capability))
+            return NotFoundError("no_such_server",
+                request.Server + " is not a game server or a capability this cluster names");
 
-        string name = services.GetRequiredService<ClusterBases>().Compose(NameKind.Alias, label);
-        NameRow? alias = services.GetRequiredService<NameService>().ClaimAlias(name, server.Member, server.Key);
+        ClusterBases bases = services.GetRequiredService<ClusterBases>();
+        NameService names = services.GetRequiredService<NameService>();
+        string name;
+        NameRow? alias;
+        if (server.Kind == NameKind.Game)
+        {
+            name = bases.Compose(NameKind.Alias, label);
+            alias = names.ClaimAlias(name, server.Member, server.Key);
+        }
+        else
+        {
+            // At the top of the zone a label can also be one of the bases themselves, and a record there
+            // would sit on the name every other cluster name hangs beneath.
+            if (bases.IsBaseLabel(label))
+                return BadRequest("invalid_label", label + " names one of this cluster's bases");
+
+            name = bases.Compose(NameKind.CapabilityAlias, label);
+            alias = names.ClaimCapabilityAlias(name, server.Key);
+        }
+
         if (alias is null)
             return Conflict("name_held", name + " is already held");
 
@@ -181,10 +201,12 @@ internal static class AdminEndpoints
 
         SqliteNameRegistry registry = services.GetRequiredService<SqliteNameRegistry>();
         NameRow? row = registry.Find(name);
-        if (row is null || row.Kind != NameKind.Alias)
+        if (row is null || row.Kind is not (NameKind.Alias or NameKind.CapabilityAlias))
             return Results.NotFound();
 
-        string server = registry.FindFor(NameKind.Game, row.Member, row.Key)?.Name ?? "";
+        string server = row.Kind == NameKind.Alias
+            ? registry.FindFor(NameKind.Game, row.Member, row.Key)?.Name ?? ""
+            : services.GetRequiredService<ClusterBases>().Compose(NameKind.Capability, row.Key);
 
         services.GetRequiredService<NameService>().Release(name);
         services.GetRequiredService<ClusterMembershipWorker>().RequestZonePass();

@@ -20,14 +20,18 @@ These are the reason the design is safe. Breaking one is not a regression in a f
 component becoming something else.
 
 - **A name points at where its own holder is reached, and nowhere else.** A node name at that node's
-  public host, a capability name at its assigned holder's host, a game name at its node's name. A host
-  is a hostname (a `CNAME`, normally a dynamic-DNS name) or a public address; `PublicHost` refuses
-  anything nobody outside could reach, and anything inside the cluster's own bases.
+  public host, a capability name and its aliases at its assigned holder's host, a game name and its
+  aliases at its node's name. A host is a hostname (a `CNAME`, normally a dynamic-DNS name) or a
+  public address; `PublicHost` refuses anything nobody outside could reach, and anything inside the
+  cluster's own bases.
 - **Only nodes hold node names.** An anchor is reached by its capability, so a machine carries one node
   name however many anchors run on it. A pinned name is reserved for its member before it joins.
-- **Nothing outside the three bases is written.** `ClusterBases.Owns` is the test, and it is a test
-  on the name rather than a judgement about intent. The names people sign in through live at the top
-  of the zone, outside every base.
+- **Nothing outside the three bases is written, except a capability alias an administrator named.**
+  `ClusterBases.Owns` is the test for the bases, and it is a test on the name rather than a judgement
+  about intent. The top of the zone is not a base: it holds the operator's own names, which a member may
+  state as its public host. A capability alias lives there by an administrator's word alone —
+  `ClusterBases.HoldsAlias` is its shape, and a record of that shape is the cluster's only when it
+  carries a `capability-alias` mark.
 - **A record without this cluster's mark is not this cluster's.** Never edited, never deleted, never
   counted as satisfying a name. A person is free to make a record that looks exactly like one of
   ours.

@@ -317,11 +317,13 @@ public sealed class RecordReconciler(
     }
 
     /// <summary>
-    /// The records that are this cluster's: inside one of its bases and carrying its mark. A record
-    /// elsewhere in the zone is not even a candidate for being read as one of ours.
+    /// The records that are this cluster's: carrying its mark, and either inside one of its bases or a
+    /// capability alias one label under the zone marked as one. A record elsewhere in the zone is not even
+    /// a candidate for being read as one of ours.
     /// </summary>
     private List<ProviderRecord> Ours(IReadOnlyList<ProviderRecord> zone) =>
-        [.. zone.Where(r => bases.Owns(r.Name) && r.Mark is not null)];
+        [.. zone.Where(r => r.Mark is { } mark
+            && (bases.Owns(r.Name) || (mark.Kind == NameKind.CapabilityAlias && bases.HoldsAlias(r.Name))))];
 
     private DesiredRecord Desired(NameRow row) =>
         new(row.Name, row.Type, row.Content, ttlSeconds, row.Mark.ToString());

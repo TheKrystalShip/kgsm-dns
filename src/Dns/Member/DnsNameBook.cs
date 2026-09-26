@@ -22,18 +22,16 @@ public sealed class DnsNameBook : Serving.IServedNames
     private volatile IReadOnlyList<DnsNameEntry> _names = [];
 
     /// <summary>
-    /// The names this member serves over HTTPS: its node name and the capability names it holds, once
-    /// published. A game name is played at directly and is never one of them.
+    /// The names this member serves over HTTPS: its node name, the capability names it holds and their
+    /// aliases, once published. A game name is played at directly and is never one of them.
     /// </summary>
     public IReadOnlyList<string> Published =>
-        [.. _names.Where(n => n.Published
-                && (n.Kind == NameKinds.Spell(NameKind.Member) || n.Kind == NameKinds.Spell(NameKind.Capability)))
-            .Select(n => n.Name)];
+        [.. _names.Where(n => n.Published && NameKinds.TakesCertificate(n.Kind)).Select(n => n.Name)];
 
     /// <inheritdoc/>
     public IReadOnlyList<string> Held =>
         [.. _names.Where(n => (n.Published || string.Equals(n.State, "pending", StringComparison.Ordinal))
-                && (n.Kind == NameKinds.Spell(NameKind.Member) || n.Kind == NameKinds.Spell(NameKind.Capability)))
+                && NameKinds.TakesCertificate(n.Kind))
             .Select(n => n.Name)];
 
     /// <summary>When the anchor last told this member anything, or null if it never has.</summary>

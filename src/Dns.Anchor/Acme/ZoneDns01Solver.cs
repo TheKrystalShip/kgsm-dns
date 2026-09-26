@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor.Providers;
+using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Acme;
 
@@ -14,9 +15,10 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Acme;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Only for a name inside the cluster's bases.</b> The challenge record sits one label deeper than
-/// the name, which puts it outside every base by the containment rule, so containment is checked against
-/// the name being validated before anything is written for it.
+/// <b>Only for a name inside the cluster's bases, or a capability alias the registry holds.</b> The
+/// challenge record sits one label deeper than the name, which puts it outside every base by the
+/// containment rule, so containment is checked against the name being validated before anything is
+/// written for it.
 /// </para>
 /// <para>
 /// The record carries a comment that is not a mark, so the zone reconcile never counts it as one of the
@@ -26,13 +28,17 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Acme;
 public sealed class ZoneDns01Solver(
     IDnsProvider provider,
     ClusterBases bases,
+    SqliteNameRegistry registry,
     ILogger<ZoneDns01Solver> logger) : IDns01Solver
 {
     private readonly ConcurrentDictionary<string, string> _written = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task PresentAsync(string name, string value, CancellationToken ct)
     {
-        if (!bases.Owns(name))
+        // A capability alias sits at the top of the zone, beside names the operator made, so the shape of
+        // the name is not enough there: it has to be one the registry holds as an alias.
+        bool alias = bases.HoldsAlias(name) && registry.Find(name) is { Kind: NameKind.CapabilityAlias };
+        if (!bases.Owns(name) && !alias)
             throw new AcmeException($"{name} is not one of this cluster's names");
 
         string challenge = ClusterBases.ChallengeFor(name);

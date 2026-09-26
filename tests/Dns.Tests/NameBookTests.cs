@@ -40,4 +40,19 @@ public sealed class NameBookTests
         Assert.Equal(["jessie.nodes.example.com"], book.Published);
         Assert.Equal(2, book.All.Count);
     }
+
+    [Fact]
+    public void A_capability_alias_is_served_and_certified_beside_its_capability()
+    {
+        // The holder of a capability serves an administrator's alias of it over HTTPS at the top of the
+        // zone, so it is asked a certificate for exactly as the capability name is.
+        var book = new DnsNameBook();
+        book.Replace([
+            new DnsNameEntry("assistant.anchors.example.com", NameKinds.Spell(NameKind.Capability), "assistant", "published", ""),
+            new DnsNameEntry("assistant.example.com", NameKinds.Spell(NameKind.CapabilityAlias), "assistant", "published", ""),
+        ]);
+
+        Assert.Equal(["assistant.anchors.example.com", "assistant.example.com"], book.Published);
+        Assert.Equal(["assistant.anchors.example.com", "assistant.example.com"], book.Held);
+    }
 }

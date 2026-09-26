@@ -122,7 +122,7 @@ public sealed record DnsZonePass(
 
 /// <summary>One name the cluster has claimed.</summary>
 /// <param name="Name">The fully qualified name.</param>
-/// <param name="Kind"><c>member</c>, <c>capability</c> or <c>game</c>.</param>
+/// <param name="Kind"><c>member</c>, <c>capability</c>, <c>game</c>, <c>alias</c> or <c>capability-alias</c>.</param>
 /// <param name="Member">The member it belongs to.</param>
 /// <param name="Key">The capability or instance within that member, empty for a node's own name.</param>
 /// <param name="Type"><c>A</c>, <c>AAAA</c> or <c>CNAME</c>.</param>
@@ -137,7 +137,10 @@ public sealed record DnsZonePass(
 /// empty for none, null when it could not be told or is not a game name. Servers on one node are never
 /// compared here — the engine answers for those.
 /// </param>
-/// <param name="AliasOf">The game name an alias follows. Null for any other kind.</param>
+/// <param name="AliasOf">
+/// The name an alias follows: a game server's name for an alias, a capability's for a capability alias.
+/// Null for any other kind.
+/// </param>
 public sealed record DnsNameStatus(
     string Name,
     string Kind,
@@ -209,9 +212,14 @@ public sealed record DnsCertificateOrder(
     DateTimeOffset? RenewsFrom,
     string? Failure);
 
-/// <summary>What a browser posts to name an existing game server under an additional label.</summary>
-/// <param name="Server">The game name to alias — an existing, published game name.</param>
-/// <param name="Label">The label the alias takes, inside the play base beside its server.</param>
+/// <summary>What a browser posts to name an existing game server or capability under an additional label.</summary>
+/// <param name="Server">
+/// The name to alias: a game name the cluster holds, or a capability's name under the anchors base.
+/// </param>
+/// <param name="Label">
+/// The label the alias takes: inside the play base beside a game server, directly under the zone for a
+/// capability.
+/// </param>
 public sealed record DnsAliasRequest(string Server, string Label);
 
 /// <summary>Every status shape, serialized without reflection.</summary>

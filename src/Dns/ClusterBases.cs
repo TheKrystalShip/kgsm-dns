@@ -1,7 +1,8 @@
 namespace TheKrystalShip.KGSM.Dns;
 
 /// <summary>
-/// The three bases a cluster's names live under, inside one zone.
+/// The three bases a cluster's names live under, inside one zone, and the one label at its top an
+/// administrator may name a capability by.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -29,6 +30,7 @@ public sealed record ClusterBases(string Zone, string Nodes, string Anchors, str
         NameKind.Capability => Anchors + "." + Zone,
         NameKind.Game => Play + "." + Zone,
         NameKind.Alias => Play + "." + Zone,
+        NameKind.CapabilityAlias => Zone,
         _ => Zone,
     };
 
@@ -57,11 +59,33 @@ public sealed record ClusterBases(string Zone, string Nodes, string Anchors, str
     }
 
     /// <summary>Whether a name sits directly under any of the three bases.</summary>
+    /// <remarks>
+    /// The top of the zone is not a base: it holds the operator's own names — the panel, a machine's
+    /// hand-made name — which a member may even state as where it is reached. A capability alias lives
+    /// there only by an administrator's word, and is recognised by <see cref="HoldsAlias"/> instead.
+    /// </remarks>
     public bool Owns(string? name) =>
         LabelOf(NameKind.Member, name) is not null
         || LabelOf(NameKind.Capability, name) is not null
         || LabelOf(NameKind.Game, name) is not null
         || LabelOf(NameKind.Alias, name) is not null;
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is a capability alias this cluster could have written: one label
+    /// directly under the zone, which is not one of the three bases themselves.
+    /// </summary>
+    /// <remarks>
+    /// A shape test only. What makes such a record the cluster's is its mark, because the operator's own
+    /// names share the shape; this is what keeps a mark from reaching anywhere deeper or elsewhere.
+    /// </remarks>
+    public bool HoldsAlias(string? name) =>
+        LabelOf(NameKind.CapabilityAlias, name) is { } label && !IsBaseLabel(label);
+
+    /// <summary>Whether a label names one of the three bases.</summary>
+    public bool IsBaseLabel(string label) =>
+        string.Equals(label, Nodes, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(label, Anchors, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(label, Play, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The challenge name an ACME order validates a name through.

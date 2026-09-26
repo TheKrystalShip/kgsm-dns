@@ -93,8 +93,9 @@ internal static class StatusEndpoints
         IReadOnlyList<NameRow> rows = registry.All();
         IReadOnlyDictionary<string, IReadOnlyList<DnsPort>> ports = registry.AllPorts();
 
-        // An alias points at the same node its server does, but a person reads "alias of what" off the
-        // server's own name — found here by the same (member, instance) pair the alias was claimed with.
+        // An alias points at the same place its server or capability does, but a person reads "alias of
+        // what" off that name: a game server's found here by the same (member, instance) pair the alias was
+        // claimed with, a capability's composed from the capability it keys on.
         Dictionary<(string Member, string Key), string> gameByOwner = rows
             .Where(r => r.Kind == NameKind.Game)
             .ToDictionary(r => (r.Member, r.Key), r => r.Name);
@@ -114,9 +115,12 @@ internal static class StatusEndpoints
                 UpdatedAt: r.UpdatedAt,
                 Ports: r.Kind == NameKind.Game && ports.TryGetValue(r.Name, out IReadOnlyList<DnsPort>? p) ? p : null,
                 Collisions: r.Kind == NameKind.Game ? collisions.For(r.Name) : null,
-                AliasOf: r.Kind == NameKind.Alias && gameByOwner.TryGetValue((r.Member, r.Key), out string? server)
-                    ? server
-                    : null)),
+                AliasOf: r.Kind switch
+                {
+                    NameKind.Alias => gameByOwner.GetValueOrDefault((r.Member, r.Key)),
+                    NameKind.CapabilityAlias => options.Bases.Compose(NameKind.Capability, r.Key),
+                    _ => null,
+                })),
         ];
 
         IReadOnlyList<MemberRow> roster = await services.GetRequiredService<MembersStore>()

@@ -15,7 +15,9 @@ namespace TheKrystalShip.KGSM.Dns.Member;
 /// </para>
 /// <para>
 /// A node's own name leads: it is the member's address whatever capabilities it holds, while a
-/// capability name moves away with the capability.
+/// capability name moves away with the capability. A capability name comes before any alias of one,
+/// because the first address is the one the cluster hands out for the member and the one its announced
+/// surface is first registered at, and an alias is a name an administrator can take away.
 /// </para>
 /// </remarks>
 public sealed class DnsSelfAddresses(DnsNameBook book, NginxSite site) : ISelfAddressSource
@@ -26,9 +28,18 @@ public sealed class DnsSelfAddresses(DnsNameBook book, NginxSite site) : ISelfAd
         get
         {
             IReadOnlyList<string> served = site.Served;
-            string? node = book.NodeName;
+            Dictionary<string, NameKind?> kinds = book.All
+                .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => NameKinds.Parse(g.First().Kind), StringComparer.OrdinalIgnoreCase);
+
             return [.. served
-                .OrderBy(name => string.Equals(name, node, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .OrderBy(name => kinds.GetValueOrDefault(name) switch
+                {
+                    NameKind.Member => 0,
+                    NameKind.Capability => 1,
+                    _ => 2,
+                })
+                .ThenBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .Select(name => "https://" + name)];
         }
     }

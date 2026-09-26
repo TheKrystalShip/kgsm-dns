@@ -5,7 +5,7 @@ using TheKrystalShip.KGSM.Dns.Serving;
 namespace TheKrystalShip.KGSM.Dns.Anchor.Issuance;
 
 /// <summary>
-/// The names this anchor serves itself: the capability names it holds, once published.
+/// The names this anchor serves itself: the capability names it holds and their aliases, once published.
 /// </summary>
 /// <remarks>
 /// Read straight from the registry. The anchor is the one member that needs nobody to tell it its names,
@@ -15,12 +15,12 @@ internal sealed class OwnNames(SqliteNameRegistry registry, AnchorOptions option
 {
     public IReadOnlyList<string> Published =>
         [.. registry.ForMember(options.MemberId)
-            .Where(r => r.Kind == NameKind.Capability && r.State == NameState.Published)
+            .Where(r => r.Kind is NameKind.Capability or NameKind.CapabilityAlias && r.State == NameState.Published)
             .Select(r => r.Name)];
 
     public IReadOnlyList<string> Held =>
         [.. registry.ForMember(options.MemberId)
-            .Where(r => r.Kind == NameKind.Capability && r.State != NameState.Blocked)
+            .Where(r => r.Kind is NameKind.Capability or NameKind.CapabilityAlias && r.State != NameState.Blocked)
             .Select(r => r.Name)];
 
     /// <summary>The registry is this anchor's own answer, so it is always one.</summary>
