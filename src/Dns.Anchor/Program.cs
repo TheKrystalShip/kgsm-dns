@@ -149,6 +149,12 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<AnchorAccounts>();
 builder.Services.AddSingleton<IReplicatedAccounts>(sp => sp.GetRequiredService<AnchorAccounts>());
+
+// What a person may do with this anchor, from the authority replica in that same file once it is at
+// schema version 2. Until then GET /me/access answers authority_unavailable.
+builder.Services.AddSingleton<IReplicatedAuthority>(sp => new AuthorityReplicaFile(
+    sp.GetRequiredService<AnchorOptions>().AccountsPath, sp.GetRequiredService<ILogger<AuthorityReplicaFile>>()));
+builder.Services.AddSingleton<MemberAccess>();
 builder.Services.AddSingleton<IClusterMessageHandler, AccountReplicationHandler>();
 builder.Services.AddSingleton<IClusterMessageHandler, AccountRemovalHandler>();
 builder.Services.AddHostedService<AccountSnapshotWorker>();
@@ -193,6 +199,9 @@ app.MapGet(NamesEndpoint.Path, NamesEndpoint.HandleAsync);
 
 // What a person's browser reads: the cluster's names as this anchor holds them, and its journal.
 StatusEndpoints.Map(app);
+
+// What the caller may do with this anchor, so the panel gates its controls by lookup.
+MeAccessEndpoint.Map(app);
 
 // What an admin's browser writes: a zone check, a certificate renewal, and a game server's aliases.
 // Admin tier only, and only on the holder — see AdminEndpoints's own remarks.

@@ -5,6 +5,16 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0]
+
+### Added — `GET /me/access`
+
+- **`GET /me/access`** answers what the caller may do with this anchor — its own `dns:*` actions,
+  cluster-wide — already evaluated from this member's replica of the authority: the account copy once it
+  is at schema version 2. The session is verified as for every read here, at any tier. Until the copy
+  moves it answers `503 authority_unavailable`, never an empty list.
+- Pins `TheKrystalShip.KGSM.Auth.Users` 2.0.0-dev.3 and `Auth.Cluster` 1.0.0-dev.14.
+
 ## [0.14.0]
 
 ### Added — an administrator can name a capability at the top of the zone (package 0.2.0-dev.15)

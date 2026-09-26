@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -151,6 +152,64 @@ public sealed class ClusterBearerTests : IDisposable
         Assert.Null(admission.Refusal);
         Assert.NotNull(admission.Identity);
         Assert.Equal("local:probe", admission.Identity!.ActorString);
+    }
+
+    // ── /me/access ────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>GET /me/access against a replica at <paramref name="replicaPath"/>: the status and the body.</summary>
+    private async Task<(int Status, System.Text.Json.JsonElement Body)> MeAccessAsync(string replicaPath)
+    {
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddSingleton(_bearer);
+        services.AddSingleton(new MemberAccess(new AuthorityReplicaFile(replicaPath, NullLogger<AuthorityReplicaFile>.Instance)));
+
+        var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+        context.Request.Headers.Authorization = "Bearer " + Mint();
+        context.Response.Body = new MemoryStream();
+
+        IResult result = await MeAccessEndpoint.HandleAsync(context);
+        await result.ExecuteAsync(context);
+
+        context.Response.Body.Position = 0;
+        return (context.Response.StatusCode, System.Text.Json.JsonDocument.Parse(context.Response.Body).RootElement);
+    }
+
+    [Fact]
+    public async Task MeAccess_WithTheAccountCopyAtVersionOne_IsAnOutageNotAnEmptyAnswer()
+    {
+        await AccountAsync(KgsmTier.Viewer, UserStatus.Active);
+
+        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(Path.Combine(_root, "accounts.db"));
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
+        Assert.Equal("authority_unavailable", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task MeAccess_FromAVersionTwoReplica_ListsThisAnchorsOwnActions()
+    {
+        await AccountAsync(KgsmTier.None, UserStatus.Active);
+
+        string replicaPath = Path.Combine(_root, "authority.db");
+        SqliteAuthorityStore replica = new(new UserStoreOptions { Path = replicaPath });
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        await replica.ApplyAsync(new CatalogRecord(
+        [
+            new CatalogActionRecord("dns:names.check", "Check the zone", "execute", "cluster", false),
+            new CatalogActionRecord("kgsm:server.start", "Start servers", "execute", "instance", false),
+        ], 2), now);
+        await replica.ApplyAsync(new PermissionRecord("prm_1", "DNS", ["dns:names.check", "kgsm:server.start"], 3), now);
+        await replica.ApplyAsync(new RoleRecord("role_1", "Zone keepers", "custom", 1, ["prm_1"], 4), now);
+        await replica.ApplyAsync(new AccountRecord("usr_probe", "probe", "Probe", "admitted", "person", "active", now, now,
+            [new ReplicatedIdentity(Handle, null)], null, [], 5), now);
+        await replica.ApplyAsync(new AssignmentRecord("asg_1", "usr_probe", "role_1", "cluster", null, now, 6), now);
+        await replica.ConfirmAsync(new AuthorityCurrent(6, 300, TheKrystalShip.KGSM.Auth.Access.AccessContract.Version, now), now);
+
+        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(replicaPath);
+
+        Assert.Equal(StatusCodes.Status200OK, status);
+        Assert.Equal(["dns:names.check"], body.GetProperty("cluster").EnumerateArray().Select(a => a.GetString()));
     }
 
     public void Dispose()
