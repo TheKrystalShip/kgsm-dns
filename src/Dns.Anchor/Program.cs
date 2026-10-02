@@ -141,23 +141,28 @@ builder.Services.AddSingleton<ICertificateRequester, OwnCertificateRequester>();
 builder.Services.AddSingleton<CertificateKeeper>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>());
 
-// A person's browser reading this anchor's page. It signs in once, at the member holding `auth`; the
-// session verifies here against the key that member publishes, and the person's authority is read from
-// this anchor's own copy of the accounts that member publishes. Every piece is the shared one every member
-// verifies with, and inert outside a cluster: no holder is heard of, no key is learned, and every
-// session is refused as unverifiable.
+// A person's browser using this anchor's page. It signs in once, at the member holding `auth`; the
+// session verifies here against the key that member publishes, and what the person may do is evaluated
+// from this anchor's own replica of the authority that member publishes. Every piece is the shared one
+// every member verifies and evaluates with, and inert outside a cluster: no holder is heard of, no key
+// is learned, and every session is refused as unverifiable.
 builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<AnchorAccounts>();
-builder.Services.AddSingleton<IReplicatedAccounts>(sp => sp.GetRequiredService<AnchorAccounts>());
 
-// What a person may do with this anchor, from the authority replica in that same file once it is at
-// schema version 2. Until then GET /me/access answers authority_unavailable.
-builder.Services.AddSingleton<IReplicatedAuthority>(sp => new AuthorityReplicaFile(
-    sp.GetRequiredService<AnchorOptions>().AccountsPath, sp.GetRequiredService<ILogger<AuthorityReplicaFile>>()));
+// The replica is this member's alone: it lives in this anchor's state directory, shares no file with any
+// other member on the machine, and is filled by the snapshot on joining and every change after.
+builder.Services.AddSingleton<IReplicatedAuthority>(sp => new OwnedReplicaFile(
+    sp.GetRequiredService<AnchorOptions>().AccountsPath, sp.GetRequiredService<ILogger<OwnedReplicaFile>>()));
+builder.Services.AddAuthorityReplica();
 builder.Services.AddSingleton<MemberAccess>();
-builder.Services.AddSingleton<IClusterMessageHandler, AccountReplicationHandler>();
-builder.Services.AddSingleton<IClusterMessageHandler, AccountRemovalHandler>();
-builder.Services.AddHostedService<AccountSnapshotWorker>();
+
+// What this anchor performs, told to the holder of the accounts: its own manifest, where the deploy
+// installs it, which is what makes its dns:* actions something a role can hold.
+builder.Services.AddSingleton(new AuthorityReporterOptions
+{
+    ManifestFiles = ["/var/lib/kgsm/anchors/actions/dns-anchor.json"],
+});
+builder.Services.AddSingleton<AuthorityReporter>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AuthorityReporter>());
 
 builder.Services.AddSingleton<ClusterSessionKeys>();
 builder.Services.AddSingleton<IClusterSessionKeys>(sp => sp.GetRequiredService<ClusterSessionKeys>());
@@ -203,8 +208,8 @@ StatusEndpoints.Map(app);
 // What the caller may do with this anchor, so the panel gates its controls by lookup.
 MeAccessEndpoint.Map(app);
 
-// What an admin's browser writes: a zone check, a certificate renewal, and a game server's aliases.
-// Admin tier only, and only on the holder — see AdminEndpoints's own remarks.
+// What a browser writes: a zone check, a certificate renewal, and a game server's aliases. Each its own
+// dns:* action, and only on the holder — see AdminEndpoints's own remarks.
 AdminEndpoints.Map(app);
 
 // What this anchor is. Serialized through the source-generated context, because a Native AOT build has

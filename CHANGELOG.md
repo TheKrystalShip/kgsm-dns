@@ -5,6 +5,27 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0]
+
+### Changed — every route checks its own `dns:*` action
+
+**Breaking.** The viewer and admin tiers are gone from this anchor. `ClusterBearer` resolves the person
+behind a cluster session in this anchor's own authority replica and evaluates the route's action across
+the cluster:
+
+- `GET /api/v1/cluster/dns` needs `dns:names.read`, `/events` `dns:journal.read`; the zone check
+  `dns:zone.check`, a renewal `dns:certificates.renew`, adding or removing an alias `dns:aliases.write`.
+  A refusal is `403 forbidden` naming the action; a replica that cannot be read is
+  `503 authority_unavailable`, a key not yet heard `503 cannot_verify`.
+- The actions are declared (`Access/DnsActions`, `ActionNamespace = "dns"`), and `ComponentConfig`
+  3.2 writes `deploy/kgsm-dns.anchor.actions.json`, which `deploy.sh` (synced with the template) and
+  the package install into `/var/lib/kgsm/anchors/actions/dns-anchor.json`. The anchor reports it to
+  the holder of the accounts itself (`AuthorityReporter`).
+- The replica at `Dns:AccountsPath` is owned by this anchor (`OwnedReplicaFile`) and filled by
+  `AddAuthorityReplica()`; a version 1 file there is set aside and the snapshot taken. The version 1
+  account copy and its replication handlers are gone with the `Auth.Users` pin.
+- Pins: `Auth` 4.0.0-dev.3, `Auth.Cluster` 1.0.0-dev.19, `ComponentConfig` 3.2.0-dev.2.
+
 ## [0.15.0]
 
 ### Added — `GET /me/access`

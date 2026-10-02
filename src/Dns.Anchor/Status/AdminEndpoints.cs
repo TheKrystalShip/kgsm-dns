@@ -23,8 +23,10 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Status;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Admin only, and only on the holder.</b> Every route needs <see cref="ClusterBearer.AdminMinimum"/>,
-/// checked here rather than trusted from the reads' viewer gate. A member standing by for the capability
+/// <b>Each route's own action, and only on the holder.</b> A zone check needs
+/// <see cref="DnsActions.ZoneCheck"/>, a renewal <see cref="DnsActions.CertificatesRenew"/>, adding or
+/// removing an alias <see cref="DnsActions.AliasesWrite"/>, each evaluated here rather than inferred from
+/// being allowed to read the page. A member standing by for the capability
 /// writes nothing — two writers would each reconcile the other's records away — so every route refuses
 /// with a body naming why before touching the registry, the zone or a member.
 /// </para>
@@ -51,7 +53,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.ZoneCheck, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -69,7 +71,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.CertificatesRenew, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -118,7 +120,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.AliasesWrite, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -188,7 +190,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.AliasesWrite, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -217,9 +219,8 @@ internal static class AdminEndpoints
     }
 
     private static Task<ClusterBearer.Admission> Authorize(
-        IServiceProvider services, HttpContext context, CancellationToken ct) =>
-        services.GetRequiredService<ClusterBearer>()
-            .AuthorizeAsync(context.Request, ClusterBearer.AdminMinimum, ct);
+        IServiceProvider services, HttpContext context, string action, CancellationToken ct) =>
+        services.GetRequiredService<ClusterBearer>().AuthorizeAsync(context.Request, action, ct);
 
     /// <summary>
     /// Whether this member is configured and holds the capability, so it is safe to write. Refusing before

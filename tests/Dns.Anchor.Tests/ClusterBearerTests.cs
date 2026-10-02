@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using TheKrystalShip.KGSM.Auth;
+using TheKrystalShip.KGSM.Auth.Access;
 using TheKrystalShip.KGSM.Auth.Cluster;
 using TheKrystalShip.KGSM.Auth.Users;
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
@@ -18,7 +19,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Tests;
 
 /// <summary>
 /// A browser reaching this anchor on the cluster's session: admitted on the key the accounts' holder
-/// publishes, with the person's authority read from this anchor's own copy of the accounts.
+/// publishes, and evaluated for the route's <c>dns:*</c> action from this anchor's own authority replica.
 /// </summary>
 public sealed class ClusterBearerTests : IDisposable
 {
@@ -30,139 +31,173 @@ public sealed class ClusterBearerTests : IDisposable
     private readonly ECDsa _signing = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly FakeKeys _keys = new();
     private readonly EndedSessions _ended;
-    private readonly AnchorAccounts _accounts;
-    private readonly SqliteUserStore _store;
-    private readonly ClusterBearer _bearer;
+    private readonly string _replicaPath;
+    private readonly SqliteAuthorityStore _replica;
+
+    // A new replica already holds version 1, so the first record delivered to it is 2.
+    private long _version = 1;
 
     public ClusterBearerTests()
     {
         AnchorOptions options = AnchorOptions.FromSettings(new AnchorSettings
         {
             MemberId = "probe-dns",
-            AccountsPath = Path.Combine(_root, "accounts.db"),
+            AccountsPath = Path.Combine(_root, "authority.db"),
             SessionsPath = Path.Combine(_root, "sessions.db"),
         });
         Directory.CreateDirectory(_root);
 
         _keys.Publish(new ECDsaSecurityKey(_signing) { KeyId = "k1" });
         _ended = new EndedSessions(options);
-        _accounts = new AnchorAccounts(options, NullLogger<AnchorAccounts>.Instance);
-        _store = new SqliteUserStore(new UserStoreOptions { Path = options.AccountsPath });
+        _replicaPath = options.AccountsPath;
+        _replica = new SqliteAuthorityStore(new UserStoreOptions { Path = _replicaPath });
+        Apply(new CatalogRecord(
+        [
+            new CatalogActionRecord(DnsActions.NamesRead, "See names", "read", "cluster", false),
+            new CatalogActionRecord(DnsActions.JournalRead, "Read logs", "read", "cluster", false),
+            new CatalogActionRecord(DnsActions.ZoneCheck, "Check the zone", "execute", "cluster", false),
+            new CatalogActionRecord(DnsActions.CertificatesRenew, "Renew", "execute", "cluster", false),
+            new CatalogActionRecord(DnsActions.AliasesWrite, "Aliases", "write", "cluster", false),
+            new CatalogActionRecord("kgsm:server.start", "Start servers", "execute", "instance", false),
+        ], Next()));
+    }
 
+    private ClusterBearer Bearer(string? replicaPath = null)
+    {
         var revocations = new ClusterSessionRevocations(
             _ended, new MemoryCache(Options.Create(new MemoryCacheOptions())), TimeSpan.FromMilliseconds(1));
-        _bearer = new ClusterBearer(_keys, revocations, _accounts);
+        return new ClusterBearer(_keys, revocations, Access(replicaPath ?? _replicaPath));
+    }
+
+    private static MemberAccess Access(string replicaPath) =>
+        new(new AuthorityReplicaFile(replicaPath, NullLogger<AuthorityReplicaFile>.Instance));
+
+    [Fact]
+    public async Task A_session_holding_the_routes_action_is_admitted_and_identified()
+    {
+        Account("active", DnsActions.NamesRead);
+
+        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(), DnsActions.NamesRead);
+
+        Assert.Null(admission.Refusal);
+        Assert.Equal("local:probe", admission.Identity!.ActorString);
+    }
+
+    /// <summary>
+    /// Reading the page is not changing the zone: each write is its own action, and holding the read
+    /// grants none of them. The refusal names what was missing.
+    /// </summary>
+    [Fact]
+    public async Task Reading_the_names_does_not_reach_a_write()
+    {
+        Account("active", DnsActions.NamesRead);
+
+        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(), DnsActions.AliasesWrite);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf(admission.Refusal));
+        Assert.Null(admission.Identity);
     }
 
     [Fact]
-    public async Task A_cluster_session_for_an_active_account_is_admitted()
+    public async Task An_account_holding_nothing_is_refused_the_page()
     {
-        await AccountAsync(KgsmTier.Viewer, UserStatus.Active);
+        Account("active");
 
-        Assert.Null(await RefuseAsync(Mint()));
+        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf((await AuthorizeAsync(Mint(), DnsActions.NamesRead)).Refusal));
+    }
+
+    /// <summary>A grant of another component's action reaches none of this anchor's.</summary>
+    [Fact]
+    public async Task Another_components_action_grants_nothing_here()
+    {
+        Account("active", "kgsm:server.start");
+
+        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf((await AuthorizeAsync(Mint(), DnsActions.ZoneCheck)).Refusal));
     }
 
     [Fact]
-    public async Task The_tier_is_the_accounts_not_the_sessions()
+    public async Task An_account_awaiting_approval_holds_nothing()
     {
-        // Minted as an admin; the copy says the account holds nothing now. The copy wins.
-        await AccountAsync(KgsmTier.None, UserStatus.Active);
+        Account("pending", DnsActions.NamesRead);
 
-        Assert.Equal(StatusCodes.Status403Forbidden, await StatusOfAsync(Mint(tier: "admin")));
+        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf((await AuthorizeAsync(Mint(), DnsActions.NamesRead)).Refusal));
     }
 
     [Fact]
     public async Task A_disabled_account_is_signed_out_here()
     {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Disabled);
+        Account("disabled", DnsActions.NamesRead);
 
-        Assert.Equal(StatusCodes.Status401Unauthorized, await StatusOfAsync(Mint()));
-    }
-
-    [Fact]
-    public async Task A_session_ended_elsewhere_is_refused()
-    {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
-        await _ended.RecordRevocationAsync("sid_ended", DateTimeOffset.UtcNow.AddDays(1));
-
-        Assert.Equal(StatusCodes.Status401Unauthorized, await StatusOfAsync(Mint(sid: "sid_ended")));
-    }
-
-    [Fact]
-    public async Task A_refresh_token_is_not_a_bearer()
-    {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
-
-        Assert.Equal(StatusCodes.Status401Unauthorized, await StatusOfAsync(Mint(kind: KgsmTokenKind.Refresh)));
-    }
-
-    [Fact]
-    public async Task A_token_signed_with_another_key_is_refused()
-    {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
-        using ECDsa other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-
-        Assert.Equal(StatusCodes.Status401Unauthorized,
-            await StatusOfAsync(Mint(key: new ECDsaSecurityKey(other) { KeyId = "k1" })));
-    }
-
-    [Fact]
-    public async Task An_empty_account_copy_cannot_tell_anybody_apart()
-    {
-        // Nothing has been copied from the accounts' holder yet: "cannot tell", never "you hold nothing".
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, await StatusOfAsync(Mint()));
-    }
-
-    [Fact]
-    public async Task No_published_key_means_no_session_can_be_verified()
-    {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
-        string token = Mint();
-        _keys.Clear();
-
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, await StatusOfAsync(token));
+        Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf((await AuthorizeAsync(Mint(), DnsActions.NamesRead)).Refusal));
     }
 
     [Fact]
     public async Task No_bearer_is_unauthorized()
     {
-        Assert.Equal(StatusCodes.Status401Unauthorized, await StatusOfAsync(token: null));
+        Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf((await AuthorizeAsync(null, DnsActions.NamesRead)).Refusal));
     }
 
     [Fact]
-    public async Task A_viewer_is_refused_a_route_that_needs_admin()
+    public async Task A_session_ended_elsewhere_is_refused()
     {
-        await AccountAsync(KgsmTier.Viewer, UserStatus.Active);
+        Account("active", DnsActions.NamesRead);
+        await _ended.RecordRevocationAsync("sid_ended", DateTimeOffset.UtcNow.AddDays(1));
 
-        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(tier: "viewer"), KgsmTier.Admin);
-
-        Assert.NotNull(admission.Refusal);
-        Assert.Null(admission.Identity);
-        Assert.Equal(StatusCodes.Status403Forbidden,
-            Assert.IsAssignableFrom<IStatusCodeHttpResult>(admission.Refusal).StatusCode);
+        Assert.Equal(StatusCodes.Status401Unauthorized,
+            StatusOf((await AuthorizeAsync(Mint(sid: "sid_ended"), DnsActions.NamesRead)).Refusal));
     }
 
     [Fact]
-    public async Task An_admin_is_admitted_to_a_route_that_needs_admin_and_is_identified()
+    public async Task A_refresh_token_is_not_a_bearer()
     {
-        await AccountAsync(KgsmTier.Admin, UserStatus.Active);
+        Account("active", DnsActions.NamesRead);
 
-        ClusterBearer.Admission admission = await AuthorizeAsync(Mint(tier: "admin"), KgsmTier.Admin);
+        Assert.Equal(StatusCodes.Status401Unauthorized,
+            StatusOf((await AuthorizeAsync(Mint(kind: KgsmTokenKind.Refresh), DnsActions.NamesRead)).Refusal));
+    }
 
-        Assert.Null(admission.Refusal);
-        Assert.NotNull(admission.Identity);
-        Assert.Equal("local:probe", admission.Identity!.ActorString);
+    [Fact]
+    public async Task A_token_signed_with_another_key_is_refused()
+    {
+        Account("active", DnsActions.NamesRead);
+        using ECDsa other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf((await AuthorizeAsync(
+            Mint(key: new ECDsaSecurityKey(other) { KeyId = "k1" }), DnsActions.NamesRead)).Refusal));
+    }
+
+    /// <summary>
+    /// No replica yet: "cannot tell", never "you hold nothing" — an outage must not tell somebody they
+    /// lack access.
+    /// </summary>
+    [Fact]
+    public async Task No_replica_cannot_tell_anybody_apart()
+    {
+        ClusterBearer.Admission admission = await AuthorizeAsync(
+            Mint(), DnsActions.NamesRead, Bearer(Path.Combine(_root, "absent.db")));
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf(admission.Refusal));
+    }
+
+    [Fact]
+    public async Task No_published_key_means_no_session_can_be_verified()
+    {
+        Account("active", DnsActions.NamesRead);
+        string token = Mint();
+        _keys.Clear();
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf((await AuthorizeAsync(token, DnsActions.NamesRead)).Refusal));
     }
 
     // ── /me/access ────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>GET /me/access against a replica at <paramref name="replicaPath"/>: the status and the body.</summary>
+    /// <summary>GET /me/access against the replica at <paramref name="replicaPath"/>: the status and the body.</summary>
     private async Task<(int Status, System.Text.Json.JsonElement Body)> MeAccessAsync(string replicaPath)
     {
         ServiceCollection services = new();
         services.AddLogging();
-        services.AddSingleton(_bearer);
-        services.AddSingleton(new MemberAccess(new AuthorityReplicaFile(replicaPath, NullLogger<AuthorityReplicaFile>.Instance)));
+        services.AddSingleton(Bearer(replicaPath));
+        services.AddSingleton(Access(replicaPath));
 
         var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
         context.Request.Headers.Authorization = "Bearer " + Mint();
@@ -176,40 +211,27 @@ public sealed class ClusterBearerTests : IDisposable
     }
 
     [Fact]
-    public async Task MeAccess_WithTheAccountCopyAtVersionOne_IsAnOutageNotAnEmptyAnswer()
+    public async Task MeAccess_WithNoReplica_IsAnOutageNotAnEmptyAnswer()
     {
-        await AccountAsync(KgsmTier.Viewer, UserStatus.Active);
-
-        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(Path.Combine(_root, "accounts.db"));
+        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(Path.Combine(_root, "absent.db"));
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
         Assert.Equal("authority_unavailable", body.GetProperty("error").GetString());
     }
 
+    /// <summary>
+    /// Somebody holding nothing here is let through, because they are exactly who needs to see that; and
+    /// only this anchor's own actions are listed.
+    /// </summary>
     [Fact]
-    public async Task MeAccess_FromAVersionTwoReplica_ListsThisAnchorsOwnActions()
+    public async Task MeAccess_ListsThisAnchorsOwnActions()
     {
-        await AccountAsync(KgsmTier.None, UserStatus.Active);
+        Account("active", DnsActions.ZoneCheck, "kgsm:server.start");
 
-        string replicaPath = Path.Combine(_root, "authority.db");
-        SqliteAuthorityStore replica = new(new UserStoreOptions { Path = replicaPath });
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        await replica.ApplyAsync(new CatalogRecord(
-        [
-            new CatalogActionRecord("dns:names.check", "Check the zone", "execute", "cluster", false),
-            new CatalogActionRecord("kgsm:server.start", "Start servers", "execute", "instance", false),
-        ], 2), now);
-        await replica.ApplyAsync(new PermissionRecord("prm_1", "DNS", ["dns:names.check", "kgsm:server.start"], 3), now);
-        await replica.ApplyAsync(new RoleRecord("role_1", "Zone keepers", "custom", 1, ["prm_1"], 4), now);
-        await replica.ApplyAsync(new AccountRecord("usr_probe", "probe", "Probe", "admitted", "person", "active", now, now,
-            [new ReplicatedIdentity(Handle, null)], null, [], 5), now);
-        await replica.ApplyAsync(new AssignmentRecord("asg_1", "usr_probe", "role_1", "cluster", null, now, 6), now);
-        await replica.ConfirmAsync(new AuthorityCurrent(6, 300, TheKrystalShip.KGSM.Auth.Access.AccessContract.Version, now), now);
-
-        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(replicaPath);
+        (int status, System.Text.Json.JsonElement body) = await MeAccessAsync(_replicaPath);
 
         Assert.Equal(StatusCodes.Status200OK, status);
-        Assert.Equal(["dns:names.check"], body.GetProperty("cluster").EnumerateArray().Select(a => a.GetString()));
+        Assert.Equal([DnsActions.ZoneCheck], body.GetProperty("cluster").EnumerateArray().Select(a => a.GetString()));
     }
 
     public void Dispose()
@@ -225,18 +247,41 @@ public sealed class ClusterBearerTests : IDisposable
         }
     }
 
-    private async Task AccountAsync(KgsmTier tier, UserStatus status)
+    private long Next() => ++_version;
+
+    /// <summary>Apply one replicated record, then confirm the replica current at its version.</summary>
+    private void Apply(Func<DateTimeOffset, Task> apply)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        await _store.CreateAsync(new KgsmUser(
-            "usr_probe", "probe", "Probe", tier, TierSource.Granted, status, now, now));
-        await _store.AddCredentialAsync(new UserCredential(
-            "cred_probe", "usr_probe", CredentialKind.Identity, Handle, null, null, now, null));
+        apply(now).GetAwaiter().GetResult();
+        _replica.ConfirmAsync(new AuthorityCurrent(_version, 300, AccessContract.Version, now), now).GetAwaiter().GetResult();
     }
 
-    private string Mint(
-        string tier = "viewer", string kind = KgsmTokenKind.Access, string sid = "sid_probe",
-        SecurityKey? key = null) =>
+    private void Apply(CatalogRecord record) => Apply(now => _replica.ApplyAsync(record, now));
+
+    private void Apply(AccountRecord record) => Apply(now => _replica.ApplyAsync(record, now));
+
+    private void Apply(PermissionRecord record) => Apply(now => _replica.ApplyAsync(record, now));
+
+    private void Apply(RoleRecord record) => Apply(now => _replica.ApplyAsync(record, now));
+
+    private void Apply(AssignmentRecord record) => Apply(now => _replica.ApplyAsync(record, now));
+
+    /// <summary>The probe's account at <paramref name="status"/>, holding <paramref name="actions"/> across the cluster.</summary>
+    private void Account(string status, params string[] actions)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        Apply(new AccountRecord("usr_probe", "probe", "Probe", "admitted", "person", status, now, now,
+            [new ReplicatedIdentity(Handle, null)], null, [], Next()));
+        if (actions.Length == 0)
+            return;
+
+        Apply(new PermissionRecord("prm_1", "Probe", actions, Next()));
+        Apply(new RoleRecord("role_1", "Probes", "custom", 1, ["prm_1"], Next()));
+        Apply(new AssignmentRecord("asg_1", "usr_probe", "role_1", "cluster", null, now, Next()));
+    }
+
+    private string Mint(string kind = KgsmTokenKind.Access, string sid = "sid_probe", SecurityKey? key = null) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = Issuer,
@@ -247,7 +292,6 @@ public sealed class ClusterBearerTests : IDisposable
             Subject = new ClaimsIdentity(
             [
                 new Claim("sub", Handle),
-                new Claim(KgsmAuthClaims.Tier, tier),
                 new Claim(KgsmAuthClaims.Host, "kgsm"),
                 new Claim(KgsmAuthClaims.TokenKind, kind),
                 new Claim(KgsmAuthClaims.SessionId, sid),
@@ -255,24 +299,15 @@ public sealed class ClusterBearerTests : IDisposable
             ]),
         });
 
-    private Task<IResult?> RefuseAsync(string? token)
+    private Task<ClusterBearer.Admission> AuthorizeAsync(string? token, string action, ClusterBearer? bearer = null)
     {
         var context = new DefaultHttpContext();
         if (token is not null)
             context.Request.Headers.Authorization = "Bearer " + token;
-        return _bearer.RefuseAsync(context.Request, CancellationToken.None);
+        return (bearer ?? Bearer()).AuthorizeAsync(context.Request, action, CancellationToken.None);
     }
 
-    private Task<ClusterBearer.Admission> AuthorizeAsync(string? token, KgsmTier minimum)
-    {
-        var context = new DefaultHttpContext();
-        if (token is not null)
-            context.Request.Headers.Authorization = "Bearer " + token;
-        return _bearer.AuthorizeAsync(context.Request, minimum, CancellationToken.None);
-    }
-
-    private async Task<int?> StatusOfAsync(string? token) =>
-        await RefuseAsync(token) is IStatusCodeHttpResult refusal ? refusal.StatusCode : null;
+    private static int? StatusOf(IResult? refusal) => (refusal as IStatusCodeHttpResult)?.StatusCode;
 
     private sealed class FakeKeys : IClusterSessionKeys
     {

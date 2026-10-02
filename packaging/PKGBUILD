@@ -77,6 +77,11 @@ package() {
     install -Dm644 "${repo}/deploy/kgsm-dns.anchor.json" \
         "${pkgdir}/var/lib/kgsm/anchors/dns-anchor.json"
 
+    # The dns:* actions this anchor performs, beside the descriptor in its actions/ directory under the
+    # same name. The anchor reports it to the holder of the accounts itself.
+    install -Dm644 "${repo}/deploy/kgsm-dns.anchor.actions.json" \
+        "${pkgdir}/var/lib/kgsm/anchors/actions/dns-anchor.json"
+
     # Serving this anchor's own names: the proxy rules every generated block includes, this component's
     # one-line include of the site it generates, the directories it keeps them in, and the grant that
     # lets the service account reload the web server and do nothing else to it.

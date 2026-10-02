@@ -5,13 +5,14 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using TheKrystalShip.KGSM.Auth;
+using TheKrystalShip.KGSM.Auth.Access;
 using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Users;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 
 /// <summary>
-/// Admits a person's browser to this anchor's reads on the session the cluster's auth anchor minted.
+/// Admits a person's browser to one of this anchor's actions on the session the cluster's auth anchor
+/// minted.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,46 +25,40 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 /// holder of <c>auth</c> publishes, and this anchor holds nothing that could sign one.
 /// </para>
 /// <para>
-/// <b>Authority is the account copy's, read on this request.</b> The tier the session was minted with is
-/// ignored; the person's current tier and whether the account is switched on are read from this anchor's
-/// own copy of the cluster's accounts. A session somebody ended elsewhere is refused from the moment the
-/// announcement arrives.
+/// <b>The session names who, the replica says what.</b> The person is resolved from the session's
+/// identity in this anchor's own authority replica and evaluated there for the route's <c>dns:*</c>
+/// action, so a role change or a disabled account lands on the next request. A session somebody ended
+/// elsewhere is refused from the moment the announcement arrives.
 /// </para>
 /// <para>
-/// <b>"Cannot tell" is its own answer.</b> An anchor that has not yet heard who holds the accounts, or has
-/// no copy of them yet, cannot verify anybody. That is a 503 naming the reason rather than a 401, which
-/// would send the browser back to a sign-in that works and then fails here the same way.
+/// <b>"Cannot tell" is its own answer.</b> An anchor that has not yet heard who holds the accounts cannot
+/// verify anybody, and one whose replica cannot be read cannot evaluate them. Both are a 503 naming the
+/// reason rather than a 401 or a 403, which would send the browser back to a sign-in that works, or tell
+/// somebody they lack access on the strength of an outage.
 /// </para>
 /// </remarks>
 internal sealed class ClusterBearer(
     IClusterSessionKeys keys,
     ClusterSessionRevocations revocations,
-    AnchorAccounts accounts)
+    MemberAccess access)
 {
     private static readonly JsonWebTokenHandler Handler = new();
 
-    /// <summary>The least a person must hold to read this anchor's pages.</summary>
-    public const KgsmTier Minimum = KgsmTier.Viewer;
-
-    /// <summary>The least a person must hold to change anything through this anchor.</summary>
-    public const KgsmTier AdminMinimum = KgsmTier.Admin;
-
-    /// <summary>
-    /// Admit the request to a read, or answer it with why not.
-    /// </summary>
+    /// <summary>Admit the request to <paramref name="action"/>, or answer it with why not.</summary>
     /// <returns>Null when the caller is admitted; otherwise the result to send back.</returns>
-    public async Task<IResult?> RefuseAsync(HttpRequest request, CancellationToken ct) =>
-        (await AuthorizeAsync(request, Minimum, ct).ConfigureAwait(false)).Refusal;
+    public async Task<IResult?> RefuseAsync(HttpRequest request, string action, CancellationToken ct) =>
+        (await AuthorizeAsync(request, action, ct).ConfigureAwait(false)).Refusal;
 
     /// <summary>
-    /// Admit the request to a route requiring at least <paramref name="minimum"/>, or answer it with why
-    /// not.
+    /// Admit the request to <paramref name="action"/>, or answer it with why not. A null action admits any
+    /// usable account here — what <c>/me/access</c> needs, since somebody holding nothing is exactly who
+    /// needs to see that.
     /// </summary>
     /// <returns>
     /// A null <see cref="Admission.Refusal"/> and the caller's identity when admitted; otherwise the
     /// result to send back and no identity.
     /// </returns>
-    public async Task<Admission> AuthorizeAsync(HttpRequest request, KgsmTier minimum, CancellationToken ct)
+    public async Task<Admission> AuthorizeAsync(HttpRequest request, string? action, CancellationToken ct)
     {
         string header = request.Headers.Authorization.ToString();
         string? token = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
@@ -74,7 +69,7 @@ internal sealed class ClusterBearer(
 
         if (keys.Audience is null || keys.Issuer is null || keys.Keys.Count == 0)
         {
-            return new Admission(Unavailable(
+            return new Admission(Unavailable("cannot_verify",
                 "this anchor has not yet heard which member holds the cluster's accounts, so it cannot "
                 + "verify a session"), null);
         }
@@ -98,19 +93,23 @@ internal sealed class ClusterBearer(
         if (await revocations.IsRevokedAsync(sessionId, ct).ConfigureAwait(false))
             return new Admission(Results.Unauthorized(), null);
 
-        AuthorityAnswer? answer = await accounts.ResolveAsync(identity, ct).ConfigureAwait(false);
-        if (answer is not { } authority)
+        MemberAccessCaller caller = await access.ResolveAsync(identity, ct).ConfigureAwait(false);
+        switch (caller.Refusal)
         {
-            return new Admission(Unavailable(accounts.UnavailableReason
-                ?? "this anchor has no copy of the cluster's accounts yet, so nobody can be identified here"), null);
+            case MemberAccessRefusal.Unavailable:
+                return new Admission(Unavailable("authority_unavailable",
+                    caller.Reason ?? "this anchor's authority replica could not be read"), null);
+
+            // A switched-off account is a door closing: the session ends here as it does on every member.
+            case MemberAccessRefusal.AccountDisabled:
+                return new Admission(Results.Unauthorized(), null);
+
+            case MemberAccessRefusal.NoAccount:
+                return new Admission(Results.StatusCode(StatusCodes.Status403Forbidden), null);
         }
 
-        // A switched-off account is a door closing: the session ends here as it does on every member.
-        if (authority.Outcome == AuthorityOutcome.Disabled)
-            return new Admission(Results.Unauthorized(), null);
-
-        if (authority.Outcome != AuthorityOutcome.Ok || authority.Tier < minimum)
-            return new Admission(Results.StatusCode(StatusCodes.Status403Forbidden), null);
+        if (action is not null && !caller.Evaluator!.Allows(caller.AccountId!, action, AccessScope.Cluster).Allowed)
+            return new Admission(Refused(action), null);
 
         return new Admission(null, identity);
     }
@@ -120,8 +119,14 @@ internal sealed class ClusterBearer(
     /// <param name="Identity">The caller's identity, present exactly when <paramref name="Refusal"/> is null.</param>
     public readonly record struct Admission(IResult? Refusal, KgsmIdentity? Identity);
 
-    private static IResult Unavailable(string reason) =>
+    /// <summary>A 403 naming the action, so whoever is asked to grant it knows what to grant.</summary>
+    private static IResult Refused(string action) =>
         Results.Json(
-            new AnchorError("cannot_verify", reason), AnchorJsonContext.Default.AnchorError,
+            new AnchorError("forbidden", $"This needs {action}."), AnchorJsonContext.Default.AnchorError,
+            statusCode: StatusCodes.Status403Forbidden);
+
+    private static IResult Unavailable(string code, string reason) =>
+        Results.Json(
+            new AnchorError(code, reason), AnchorJsonContext.Default.AnchorError,
             statusCode: StatusCodes.Status503ServiceUnavailable);
 }

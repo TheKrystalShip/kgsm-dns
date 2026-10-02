@@ -180,10 +180,11 @@ internal sealed class AnchorSettings
         Risk = ConfigRisk.Wiring)]
     public string AllowedOrigins { get; set; } = "";
 
-    /// <summary>Where this anchor keeps its copy of the cluster's accounts.</summary>
-    /// <panel>This anchor's own copy of the cluster's accounts, filled by the member that holds them. It
-    /// is what decides who may read this page, read afresh on every request.</panel>
-    [ConfigField("accountsPath", "Account copy", Group = "storage", Type = ConfigType.Path,
+    /// <summary>Where this anchor keeps its replica of the cluster's authority.</summary>
+    /// <panel>This anchor's own replica of the cluster's accounts, roles and grants, filled by the member
+    /// that holds them. It is what decides who may do what on this page, read afresh on every
+    /// request.</panel>
+    [ConfigField("accountsPath", "Authority replica", Group = "storage", Type = ConfigType.Path,
         Risk = ConfigRisk.Wiring)]
     public string AccountsPath { get; set; } = "/var/lib/kgsm-dns/accounts.db";
 

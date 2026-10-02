@@ -341,13 +341,27 @@ PY
         install -m 0644 "$LEAF_DESCRIPTOR" "$dst"
     fi
 
-    # A component that has changed kind leaves its old file behind, and a stale descriptor in the
-    # leaves directory is read as a leaf however the component now describes itself.
-    local other
-    [[ "$dir" == "$ANCHOR_DESCRIPTOR_DIR" ]] && other="${LEAF_DESCRIPTOR_DIR}/${LEAF_ID}.json" \
-                                             || other="${ANCHOR_DESCRIPTOR_DIR}/${LEAF_ID}.json"
-    if [[ -f "$other" ]]; then
-        log "removing ${other} — this component is described in ${dir}"
-        rm -f "$other"
+    # The action manifest the build writes beside the descriptor, installed under the same name in
+    # the actions/ directory beside it: what this node reports to the auth anchor as the actions this
+    # component performs, and what the catalog of grantable actions is built from.
+    local manifest="${LEAF_DESCRIPTOR%.json}.actions.json"
+    if [[ -f "$manifest" ]]; then
+        install -d -m 0755 "${dir}/actions"
+        if ! cmp -s "$manifest" "${dir}/actions/${LEAF_ID}.json"; then
+            log "action manifest changed → ${dir}/actions/${LEAF_ID}.json"
+            install -m 0644 "$manifest" "${dir}/actions/${LEAF_ID}.json"
+        fi
     fi
+
+    # A component that has changed kind leaves its old files behind, and a stale descriptor in the
+    # leaves directory is read as a leaf however the component now describes itself.
+    local other_dir
+    [[ "$dir" == "$ANCHOR_DESCRIPTOR_DIR" ]] && other_dir="$LEAF_DESCRIPTOR_DIR" || other_dir="$ANCHOR_DESCRIPTOR_DIR"
+    local other
+    for other in "${other_dir}/${LEAF_ID}.json" "${other_dir}/actions/${LEAF_ID}.json"; do
+        if [[ -f "$other" ]]; then
+            log "removing ${other} — this component is described in ${dir}"
+            rm -f "$other"
+        fi
+    done
 }

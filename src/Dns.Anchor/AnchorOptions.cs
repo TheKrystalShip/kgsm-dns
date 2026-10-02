@@ -29,7 +29,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor;
 /// <param name="ClusterStorePath">Where this member keeps its roster, outbox and inbox.</param>
 /// <param name="ConfigDescriptorPath">Where the descriptor this build wrote is installed.</param>
 /// <param name="AllowedOrigins">Browser origins allowed to read this anchor's status.</param>
-/// <param name="AccountsPath">Where this anchor keeps its copy of the cluster's accounts.</param>
+/// <param name="AccountsPath">Where this anchor keeps its replica of the cluster's authority.</param>
 /// <param name="SessionsPath">Where sessions ended elsewhere in the cluster are recorded.</param>
 internal sealed record AnchorOptions(
     string MemberId,

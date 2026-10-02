@@ -12,7 +12,9 @@ using TheKrystalShip.KGSM.ComponentConfig;
     id: "dns-anchor",
     displayName: "DNS anchor",
     unit: "kgsm-dns.service",
-    role: "Publishes the names a cluster is reached at — members, capabilities and game servers — and is the only member holding a credential for the zone.")]
+    role: "Publishes the names a cluster is reached at — members, capabilities and game servers — and is the only member holding a credential for the zone.",
+    // Its actions are dns:*, whatever the descriptor's id: a role grants "dns:aliases.write".
+    ActionNamespace = "dns")]
 
 // Panel sections, in the order they render. Fields land in one by naming its id, and follow the order
 // they are declared in AnchorSettings.

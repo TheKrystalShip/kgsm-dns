@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "component": "dns",
+  "version": "0.16.0",
+  "actions": [
+    {
+      "id": "aliases.write",
+      "title": "Add and remove names for game servers and capabilities",
+      "effect": "write",
+      "scope": "cluster"
+    },
+    {
+      "id": "certificates.renew",
+      "title": "Renew a member's certificate",
+      "effect": "execute",
+      "scope": "cluster"
+    },
+    {
+      "id": "config.read",
+      "title": "Read DNS anchor settings",
+      "effect": "read",
+      "scope": "cluster"
+    },
+    {
+      "id": "config.write",
+      "title": "Change DNS anchor settings",
+      "effect": "write",
+      "scope": "cluster"
+    },
+    {
+      "id": "journal.read",
+      "title": "Read DNS anchor logs",
+      "effect": "read",
+      "scope": "cluster"
+    },
+    {
+      "id": "lifecycle.restart",
+      "title": "Restart DNS anchor",
+      "effect": "execute",
+      "scope": "cluster"
+    },
+    {
+      "id": "names.read",
+      "title": "See the cluster's names and certificates",
+      "effect": "read",
+      "scope": "cluster"
+    },
+    {
+      "id": "zone.check",
+      "title": "Check the cluster's DNS zone now",
+      "effect": "execute",
+      "scope": "cluster"
+    }
+  ],
+  "requires": []
+}

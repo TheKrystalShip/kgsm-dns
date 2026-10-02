@@ -87,18 +87,20 @@ through the same entitlement checks the zone pass itself runs under.
 | `GET /api/v1/cluster/dns/events?limit=` | the newest lines of the anchor's own event journal, newest first, as the journal holds them |
 
 A caller presents the session the cluster's auth anchor minted. It verifies here against the key that
-member publishes through gossip, and the person's authority is read on every request from the anchor's
-own copy of the cluster's accounts — a viewer or above is admitted to the reads above, a disabled account
-is signed out, and a session ended elsewhere is refused from the moment the announcement arrives. An
-anchor that has not yet heard the key, or has no copy of the accounts yet, answers `503` naming the
-reason rather than `401`. The Control Panel's origin is listed in `AllowedOrigins`.
+member publishes through gossip, and what the person may do is evaluated on every request from the
+anchor's own replica of the cluster's authority — the names need `dns:names.read`, the journal
+`dns:journal.read`; a disabled account is signed out, and a session ended elsewhere is refused from the
+moment the announcement arrives. A refusal names the action. An anchor that has not yet heard the key
+answers `503 cannot_verify`, and one whose replica cannot be read `503 authority_unavailable`, rather
+than `401`. `GET /me/access` lists the `dns:*` actions the caller holds. The Control Panel's origin is listed in `AllowedOrigins`.
 
 Unknown is never reported as none. A pass that has not run, a host that did not resolve, a collision
 that could not be checked and a certificate issued before anything recorded it are all null.
 
-## What an admin can write
+## What can be written
 
-Every route below needs admin, the same accounts copy checked on every read, and refuses with a body
+Each route below needs its own action — a zone check `dns:zone.check`, a renewal
+`dns:certificates.renew`, an alias `dns:aliases.write` — evaluated the same way, and refuses with a body
 naming why on a member standing by for the capability or one with no zone and credential configured —
 such a member writes nothing, the same as the zone pass itself.
 

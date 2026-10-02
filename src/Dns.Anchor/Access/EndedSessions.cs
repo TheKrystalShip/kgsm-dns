@@ -17,7 +17,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 /// refusal here. Kept on disk so a restart does not accept again a bearer that was already ended.
 /// </para>
 /// <para>
-/// A person switched off entirely is refused by the account copy instead, on their next request.
+/// A person switched off entirely is refused by the authority replica instead, on their next request.
 /// </para>
 /// </remarks>
 internal sealed class EndedSessions : IClusterSessionDenyList

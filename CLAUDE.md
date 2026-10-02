@@ -76,12 +76,16 @@ component becoming something else.
   build from `AnchorSettings` and `Descriptor.cs`. The `.anchor.json` suffix routes it to
   `/var/lib/kgsm/anchors/`, which is not where a node's leaves are scanned for.
 - **Logging is `AddSystemdConsole()`** with the ecosystem's level convention.
-- **The browser surface is behind the cluster's session, viewer for a read and admin for a write.**
-  `Status/StatusEndpoints` serves `/api/v1/cluster/dns` and its `/events`; `Status/AdminEndpoints` serves
-  the zone check, the certificate renewal and the alias routes. `Access/ClusterBearer` admits a caller
-  through the shared `ClusterSessionValidation` (its own half is a key that signs nothing) and reads
-  authority from this anchor's own account copy (`AnchorAccounts`) on every request — `RefuseAsync` for a
-  read, `AuthorizeAsync` naming the route's own minimum for a write. Nothing reachable from a browser
+- **The browser surface is behind the cluster's session, each route checking its own `dns:*` action.**
+  `Status/StatusEndpoints` serves `/api/v1/cluster/dns` (`dns:names.read`) and its `/events`
+  (`dns:journal.read`); `Status/AdminEndpoints` serves the zone check (`dns:zone.check`), the certificate
+  renewal (`dns:certificates.renew`) and the alias routes (`dns:aliases.write`); `/me/access` lists what
+  the caller holds of them. `Access/ClusterBearer` admits a caller through the shared
+  `ClusterSessionValidation` (its own half is a key that signs nothing), resolves the person in this
+  anchor's own authority replica (`OwnedReplicaFile` at `Dns:AccountsPath`, filled by
+  `AddAuthorityReplica()`) and evaluates the route's action across the cluster on every request. The
+  actions are declared in `Access/DnsActions` and reach the catalog through the manifest this anchor
+  reports itself (`AuthorityReporter`, `/var/lib/kgsm/anchors/actions/dns-anchor.json`). Nothing reachable from a browser
   writes the zone, the registry or the issuer directly: a write route calls the same `NameService`,
   `ClusterMembershipWorker` and `CertificateKeeper` the zone pass itself uses, under the same entitlement
   checks, and refuses outright on a member standing by for the capability.

@@ -7,8 +7,8 @@ namespace TheKrystalShip.KGSM.Dns.Status;
 /// <summary>The routes the DNS anchor answers a person's browser on.</summary>
 /// <remarks>
 /// Served by the anchor itself and verified against the cluster's sessions, so a cluster whose nodes run
-/// no Control Panel API still has a page for its names. The reads are open to a viewer; the writes below
-/// need admin and never touch a name this cluster does not already own the base of.
+/// no Control Panel API still has a page for its names. Each route checks its own <c>dns:*</c> action, and
+/// the writes below never touch a name this cluster does not already own the base of.
 /// </remarks>
 public static class DnsStatusRoutes
 {

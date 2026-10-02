@@ -54,7 +54,7 @@ internal static class StatusEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, ct)
+        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsActions.NamesRead, ct)
                 .ConfigureAwait(false) is { } refusal)
         {
             return refusal;
@@ -198,7 +198,7 @@ internal static class StatusEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, ct)
+        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsActions.JournalRead, ct)
                 .ConfigureAwait(false) is { } refusal)
         {
             return refusal;
