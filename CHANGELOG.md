@@ -5,6 +5,15 @@ All notable changes to `kgsm-dns` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — the anchor publishes its operations (0.17.0)
+
+`GET /operations` lists every gated route and the `dns:*` action it requires, in `Auth.Access`'s
+`OperationManifest` shape. Each route declares its action as `DnsAction` metadata, which its handler
+reads to enforce and the document is built from, so a client gates a control on the request it is
+about to make and names no action itself.
+
 ## [0.16.0]
 
 ### Changed — every route checks its own `dns:*` action

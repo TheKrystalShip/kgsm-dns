@@ -208,6 +208,10 @@ StatusEndpoints.Map(app);
 // What the caller may do with this anchor, so the panel gates its controls by lookup.
 MeAccessEndpoint.Map(app);
 
+// Which action each gated route requires, built from the routes' own declarations, so the panel names
+// no dns:* action of its own.
+DnsOperations.Map(app);
+
 // What a browser writes: a zone check, a certificate renewal, and a game server's aliases. Each its own
 // dns:* action, and only on the holder — see AdminEndpoints's own remarks.
 AdminEndpoints.Map(app);

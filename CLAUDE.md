@@ -80,7 +80,10 @@ component becoming something else.
   `Status/StatusEndpoints` serves `/api/v1/cluster/dns` (`dns:names.read`) and its `/events`
   (`dns:journal.read`); `Status/AdminEndpoints` serves the zone check (`dns:zone.check`), the certificate
   renewal (`dns:certificates.renew`) and the alias routes (`dns:aliases.write`); `/me/access` lists what
-  the caller holds of them. `Access/ClusterBearer` admits a caller through the shared
+  the caller holds of them. Each route declares its action as `DnsAction` metadata, which its handler
+  reads to enforce and `GET /operations` (`Access/DnsOperations`) publishes, so a client names no
+  `dns:*` action of its own; a route checking an action it does not declare is one no client can see.
+  `Access/ClusterBearer` admits a caller through the shared
   `ClusterSessionValidation` (its own half is a key that signs nothing), resolves the person in this
   anchor's own authority replica (`OwnedReplicaFile` at `Dns:AccountsPath`, filled by
   `AddAuthorityReplica()`) and evaluates the route's action across the cluster on every request. The

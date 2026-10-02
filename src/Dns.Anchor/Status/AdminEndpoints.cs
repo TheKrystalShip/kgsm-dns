@@ -42,10 +42,10 @@ internal static class AdminEndpoints
 {
     public static void Map(WebApplication app)
     {
-        app.MapPost(DnsStatusRoutes.ZoneCheck, (Delegate)ZoneCheckAsync);
-        app.MapPost(DnsStatusRoutes.CertificateRenew, (Delegate)RenewAsync);
-        app.MapPost(DnsStatusRoutes.Aliases, (Delegate)AddAliasAsync);
-        app.MapDelete(DnsStatusRoutes.Alias, (Delegate)RemoveAliasAsync);
+        app.MapPost(DnsStatusRoutes.ZoneCheck, (Delegate)ZoneCheckAsync).WithMetadata(new DnsAction(DnsActions.ZoneCheck));
+        app.MapPost(DnsStatusRoutes.CertificateRenew, (Delegate)RenewAsync).WithMetadata(new DnsAction(DnsActions.CertificatesRenew));
+        app.MapPost(DnsStatusRoutes.Aliases, (Delegate)AddAliasAsync).WithMetadata(new DnsAction(DnsActions.AliasesWrite));
+        app.MapDelete(DnsStatusRoutes.Alias, (Delegate)RemoveAliasAsync).WithMetadata(new DnsAction(DnsActions.AliasesWrite));
     }
 
     private static async Task<IResult> ZoneCheckAsync(HttpContext context)
@@ -53,7 +53,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.ZoneCheck, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -71,7 +71,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.CertificatesRenew, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -120,7 +120,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.AliasesWrite, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -190,7 +190,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, DnsActions.AliasesWrite, ct).ConfigureAwait(false);
+        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
         if (admission.Refusal is { } refusal)
             return refusal;
 
@@ -218,9 +218,9 @@ internal static class AdminEndpoints
         return Results.NoContent();
     }
 
-    private static Task<ClusterBearer.Admission> Authorize(
-        IServiceProvider services, HttpContext context, string action, CancellationToken ct) =>
-        services.GetRequiredService<ClusterBearer>().AuthorizeAsync(context.Request, action, ct);
+    // The action is the one the route declares, which is also what this anchor publishes for it.
+    private static Task<ClusterBearer.Admission> Authorize(IServiceProvider services, HttpContext context, CancellationToken ct) =>
+        services.GetRequiredService<ClusterBearer>().AuthorizeAsync(context.Request, DnsAction.Of(context), ct);
 
     /// <summary>
     /// Whether this member is configured and holds the capability, so it is safe to write. Refusing before

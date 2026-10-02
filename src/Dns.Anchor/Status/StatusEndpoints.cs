@@ -45,8 +45,8 @@ internal static class StatusEndpoints
     {
         // Cast to Delegate so each binds as a route handler, whose returned result is what is sent. Bound as
         // a request delegate — the overload a lone HttpContext parameter picks — the result is discarded.
-        app.MapGet(DnsStatusRoutes.Status, (Delegate)StatusAsync);
-        app.MapGet(DnsStatusRoutes.Events, (Delegate)EventsAsync);
+        app.MapGet(DnsStatusRoutes.Status, (Delegate)StatusAsync).WithMetadata(new DnsAction(DnsActions.NamesRead));
+        app.MapGet(DnsStatusRoutes.Events, (Delegate)EventsAsync).WithMetadata(new DnsAction(DnsActions.JournalRead));
     }
 
     private static async Task<IResult> StatusAsync(HttpContext context)
@@ -54,7 +54,7 @@ internal static class StatusEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsActions.NamesRead, ct)
+        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsAction.Of(context), ct)
                 .ConfigureAwait(false) is { } refusal)
         {
             return refusal;
@@ -198,7 +198,7 @@ internal static class StatusEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsActions.JournalRead, ct)
+        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsAction.Of(context), ct)
                 .ConfigureAwait(false) is { } refusal)
         {
             return refusal;
