@@ -48,16 +48,16 @@ public static class DnsEvents
     /// <summary>A pass completed again, after one that could not.</summary>
     public const string ZoneRestored = "dns.zone.restored";
 
-    /// <summary>An admin asked for a zone pass sooner than the timer would run one.</summary>
+    /// <summary>Somebody asked for a zone pass sooner than the timer would run one.</summary>
     public const string ZoneCheckRequested = "dns.zone.check_requested";
 
-    /// <summary>An admin asked for a certificate to be renewed now, ahead of its own schedule.</summary>
+    /// <summary>Somebody asked for a certificate to be renewed now, ahead of its own schedule.</summary>
     public const string CertificateRenewRequested = "dns.certificate.renew_requested";
 
-    /// <summary>An admin named an existing game server under an additional label.</summary>
+    /// <summary>Somebody named an existing game server under an additional label.</summary>
     public const string AliasAdded = "dns.alias.added";
 
-    /// <summary>An admin gave up an alias.</summary>
+    /// <summary>Somebody gave up an alias.</summary>
     public const string AliasRemoved = "dns.alias.removed";
 }
 

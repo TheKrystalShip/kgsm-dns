@@ -26,10 +26,10 @@ component becoming something else.
   cluster's own bases.
 - **Only nodes hold node names.** An anchor is reached by its capability, so a machine carries one node
   name however many anchors run on it. A pinned name is reserved for its member before it joins.
-- **Nothing outside the three bases is written, except a capability alias an administrator named.**
+- **Nothing outside the three bases is written, except a capability alias somebody named under `dns:aliases.write`.**
   `ClusterBases.Owns` is the test for the bases, and it is a test on the name rather than a judgement
   about intent. The top of the zone is not a base: it holds the operator's own names, which a member may
-  state as its public host. A capability alias lives there by an administrator's word alone —
+  state as its public host. A capability alias lives there by a person's word alone —
   `ClusterBases.HoldsAlias` is its shape, and a record of that shape is the cluster's only when it
   carries a `capability-alias` mark.
 - **A record without this cluster's mark is not this cluster's.** Never edited, never deleted, never

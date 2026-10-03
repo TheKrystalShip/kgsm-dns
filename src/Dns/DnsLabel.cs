@@ -8,7 +8,7 @@ namespace TheKrystalShip.KGSM.Dns;
 /// </summary>
 /// <remarks>
 /// A suggestion arrives from something that was never shaped for DNS: a blueprint id, a member id, a
-/// name an administrator typed. So a suggestion is reduced rather than rejected, and what comes out is
+/// name somebody typed. So a suggestion is reduced rather than rejected, and what comes out is
 /// either a valid label or nothing at all — an empty answer says "this cannot be a name", which the
 /// caller reports, instead of a label that the provider will refuse later for reasons the caller
 /// cannot see.

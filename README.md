@@ -115,7 +115,7 @@ such a member writes nothing, the same as the zone pass itself.
 `dns.name.published`, `.moved`, `.withdrawn`, `.contested`, `.recovered`; `dns.certificate.issued`,
 `.failed`, `.refused`, `.renew_requested`; `dns.zone.unreachable`, `.restored` and `.check_requested`;
 `dns.alias.added` and `.removed`. A quiet pass writes nothing. Names and payloads are the package's
-(`DnsEvents`, `DnsEventPayloads`); an admin action's actor is the person, `provider:username`.
+(`DnsEvents`, `DnsEventPayloads`); the actor of an action a person asked for is that person, `provider:username`.
 
 ## Packages
 

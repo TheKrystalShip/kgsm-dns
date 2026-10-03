@@ -199,7 +199,7 @@ public sealed class NameService(
     /// member holds it next.
     /// </summary>
     /// <remarks>
-    /// The alias outlives any one holder: it is the administrator's name for the capability, not for the
+    /// The alias outlives any one holder: it is a person's name for the capability, not for the
     /// member serving it now, so a capability nobody holds leaves it blocked rather than released.
     /// </remarks>
     /// <param name="name">The alias's own fully qualified name, already composed and validated.</param>
@@ -394,8 +394,8 @@ public sealed class NameService(
 
     /// <summary>
     /// Give up every name one member holds — its node name, its game names and any capability name
-    /// following it. The records go with them on the next reconcile. A capability alias is the
-    /// administrator's name for the capability rather than for this member, so it stays, and follows the
+    /// following it. The records go with them on the next reconcile. A capability alias is a
+    /// person's name for the capability rather than for this member, so it stays, and follows the
     /// capability on the next pass.
     /// </summary>
     /// <returns>The names released.</returns>

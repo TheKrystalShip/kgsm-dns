@@ -3,8 +3,8 @@ namespace TheKrystalShip.KGSM.Dns;
 /// <summary>What a published name names.</summary>
 /// <remarks>
 /// The kind picks the base a name lives under, and each base is a separate containment boundary: the
-/// anchor writes inside its three bases, and at the top of the zone only the capability aliases an
-/// administrator names there. A record that is not the cluster's — the zone apex, mail, anything an
+/// anchor writes inside its three bases, and at the top of the zone only the capability aliases a
+/// person names there. A record that is not the cluster's — the zone apex, mail, anything an
 /// operator made by hand — carries no mark of any kind and cannot be reached by any message a member
 /// sends.
 /// </remarks>
@@ -20,13 +20,13 @@ public enum NameKind
     Game,
 
     /// <summary>
-    /// An admin-chosen additional name for an existing game server, under the play base beside it. It
+    /// A person-chosen additional name for an existing game server, under the play base beside it. It
     /// follows the same node the game name does and is played at directly the same way.
     /// </summary>
     Alias,
 
     /// <summary>
-    /// An admin-chosen name for a capability, one label directly under the zone. It points where the
+    /// A person-chosen name for a capability, one label directly under the zone. It points where the
     /// capability's own name does — at the holder's public host — and moves with the capability. Its
     /// holder serves it over HTTPS beside the capability name, so it is entitled to a certificate.
     /// </summary>

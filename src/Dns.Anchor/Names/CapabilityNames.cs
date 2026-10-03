@@ -6,7 +6,7 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Names;
 
 /// <summary>
 /// Keeps one name under the anchors base for every capability the cluster assigns, pointing at whoever
-/// holds it, and every alias an administrator gave a capability pointing at the same place.
+/// holds it, and every alias somebody gave a capability pointing at the same place.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -76,7 +76,7 @@ public sealed class CapabilityNames(NameService names, SqliteNameRegistry regist
             touched.Add(orphan.Member);
         }
 
-        // An administrator's alias of a capability follows the capability's own name, so it is brought to
+        // An alias of a capability follows the capability's own name, so it is brought to
         // match only once every capability name above is where it now stands.
         touched.UnionWith(names.RetargetCapabilityAliases());
 

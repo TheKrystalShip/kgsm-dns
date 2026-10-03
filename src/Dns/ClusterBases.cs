@@ -1,8 +1,8 @@
 namespace TheKrystalShip.KGSM.Dns;
 
 /// <summary>
-/// The three bases a cluster's names live under, inside one zone, and the one label at its top an
-/// administrator may name a capability by.
+/// The three bases a cluster's names live under, inside one zone, and the one label at its top a
+/// capability may be named by under <c>dns:aliases.write</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -62,7 +62,7 @@ public sealed record ClusterBases(string Zone, string Nodes, string Anchors, str
     /// <remarks>
     /// The top of the zone is not a base: it holds the operator's own names — the panel, a machine's
     /// hand-made name — which a member may even state as where it is reached. A capability alias lives
-    /// there only by an administrator's word, and is recognised by <see cref="HoldsAlias"/> instead.
+    /// there only by a person's word, and is recognised by <see cref="HoldsAlias"/> instead.
     /// </remarks>
     public bool Owns(string? name) =>
         LabelOf(NameKind.Member, name) is not null

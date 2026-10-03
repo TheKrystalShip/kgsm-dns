@@ -276,7 +276,7 @@ internal static class StatusEndpoints
         return lines;
     }
 
-    /// <summary>The wire spelling of a registry row's state, shared with the admin write routes.</summary>
+    /// <summary>The wire spelling of a registry row's state, shared with the write routes.</summary>
     internal static string Spell(NameState state) => state switch
     {
         NameState.Published => "published",

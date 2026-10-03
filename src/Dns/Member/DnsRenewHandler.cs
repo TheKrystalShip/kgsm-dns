@@ -8,7 +8,7 @@ using TheKrystalShip.KGSM.Dns.Serving;
 namespace TheKrystalShip.KGSM.Dns.Member;
 
 /// <summary>
-/// Asks for a certificate for one of this member's names ahead of its own schedule, because an admin
+/// Asks for a certificate for one of this member's names ahead of its own schedule, because somebody
 /// asked the DNS anchor to renew it.
 /// </summary>
 /// <remarks>

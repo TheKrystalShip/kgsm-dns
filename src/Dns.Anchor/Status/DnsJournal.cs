@@ -42,7 +42,7 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
     /// </summary>
     internal const string ProducerId = "kgsm-dns";
 
-    /// <summary>The surface an admin action came through.</summary>
+    /// <summary>The surface a person's action came through.</summary>
     internal const string OriginUi = "ui";
 
     /// <summary>Record every change one zone pass made.</summary>
@@ -98,26 +98,26 @@ internal sealed class DnsJournal(IEventJournalWriter writer, ILogger<DnsJournal>
             severity: EventSeverity.Warn, outcome: EventOutcome.Failure,
             summary: $"asked for a certificate for {name} and was refused{Because(reason)}");
 
-    /// <summary>Record an admin asking for a zone pass sooner than the timer would run one.</summary>
+    /// <summary>Record somebody asking for a zone pass sooner than the timer would run one.</summary>
     public Task ZoneCheckRequestedAsync(string actor, CancellationToken ct) =>
         WriteAsync(DnsEvents.ZoneCheckRequested, _ => { }, ct, actor, OriginUi,
             severity: EventSeverity.Info, outcome: EventOutcome.Neutral,
             summary: "asked for a zone pass now");
 
-    /// <summary>Record an admin asking for a certificate to be renewed now, ahead of its own schedule.</summary>
+    /// <summary>Record somebody asking for a certificate to be renewed now, ahead of its own schedule.</summary>
     public Task RenewRequestedAsync(string name, string member, string actor, CancellationToken ct) =>
         WriteAsync(DnsEvents.CertificateRenewRequested, DnsEventPayloads.CertificateRequested(name, member), ct,
             actor, OriginUi,
             severity: EventSeverity.Info, outcome: EventOutcome.Neutral,
             summary: $"asked for {name}'s certificate to be renewed now");
 
-    /// <summary>Record an admin naming an existing game server under an additional label.</summary>
+    /// <summary>Record somebody naming an existing game server under an additional label.</summary>
     public Task AliasAddedAsync(string name, string server, string actor, CancellationToken ct) =>
         WriteAsync(DnsEvents.AliasAdded, DnsEventPayloads.Alias(name, server), ct, actor, OriginUi,
             severity: EventSeverity.Info, outcome: EventOutcome.Success,
             summary: $"named {server} {name} as well");
 
-    /// <summary>Record an admin giving up an alias.</summary>
+    /// <summary>Record somebody giving up an alias.</summary>
     /// <remarks>
     /// <b>Warn, like every other name leaving the zone.</b> An alias is what somebody's bookmark and
     /// whatever they told their players both say, and giving it up stops all of them resolving.

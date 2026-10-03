@@ -46,7 +46,7 @@ public static class DnsMessageTypes
     public const string Instances = "dns.instances";
 
     /// <summary>
-    /// The DNS anchor to a member: ask for a certificate now, ahead of its own schedule. An admin action,
+    /// The DNS anchor to a member: ask for a certificate now, ahead of its own schedule. A person's request,
     /// not a fact about the name — the member decides for itself whether to act on it.
     /// </summary>
     public const string Renew = "dns.renew";

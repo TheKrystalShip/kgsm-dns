@@ -17,7 +17,7 @@ namespace TheKrystalShip.KGSM.Dns.Member;
 /// A node's own name leads: it is the member's address whatever capabilities it holds, while a
 /// capability name moves away with the capability. A capability name comes before any alias of one,
 /// because the first address is the one the cluster hands out for the member and the one its announced
-/// surface is first registered at, and an alias is a name an administrator can take away.
+/// surface is first registered at, and an alias is a name somebody can take away.
 /// </para>
 /// </remarks>
 public sealed class DnsSelfAddresses(DnsNameBook book, NginxSite site) : ISelfAddressSource

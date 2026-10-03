@@ -74,7 +74,7 @@ public sealed class CertificateKeeper(
     /// Ask for a certificate for one published name right now, whether or not it is due.
     /// </summary>
     /// <remarks>
-    /// An admin asking for a renewal means now, not "the next time the fraction of lifetime left says so"
+    /// Somebody asking for a renewal means now, not "the next time the fraction of lifetime left says so"
     /// — the one case <see cref="PassAsync"/> itself never takes.
     /// </remarks>
     /// <returns>Whether the name is one this member serves, so a request was made.</returns>
