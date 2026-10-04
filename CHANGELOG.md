@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — built on released packages (0.17.1, package 0.2.0)
+
+- `TheKrystalShip.KGSM.Dns` is released as 0.2.0, pinning `Cluster` 1.0.0.
+- The anchor pins `Cluster` 1.0.0, `Auth` 4.0.0, `Auth.Cluster` 1.0.0, `Auth.Access` 1.0.0 and
+  `ComponentConfig` 3.2.0. No behaviour changes.
+
 ### Added — the anchor publishes its operations (0.17.0)
 
 `GET /operations` lists every gated route and the `dns:*` action it requires, in `Auth.Access`'s
