@@ -9,10 +9,10 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-using TheKrystalShip.KGSM.Auth;
-using TheKrystalShip.KGSM.Auth.Access;
-using TheKrystalShip.KGSM.Auth.Cluster;
-using TheKrystalShip.KGSM.Auth.Users;
+using TheKrystalShip.Auth;
+using TheKrystalShip.Auth.Access;
+using TheKrystalShip.Auth.Cluster;
+using TheKrystalShip.Auth.Users;
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Tests;

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-using TheKrystalShip.KGSM.Auth.Access;
-using TheKrystalShip.KGSM.Auth.Cluster;
+using TheKrystalShip.Auth.Access;
+using TheKrystalShip.Auth.Cluster;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 

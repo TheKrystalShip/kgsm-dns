@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
-using TheKrystalShip.KGSM.Auth.Access;
+using TheKrystalShip.Auth.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Status;
 using TheKrystalShip.KGSM.Dns.Status;

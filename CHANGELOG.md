@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — built on tks-auth's packages (0.17.2)
+
+- The anchor takes `TheKrystalShip.Auth` 5.0.0, `Auth.Cluster` 2.0.0 and `Auth.Access` 2.0.0, the auth
+  packages under their new ids. The namespaces follow. No behaviour changes.
+
 ### Changed — built on released packages (0.17.1, package 0.2.0)
 
 - `TheKrystalShip.KGSM.Dns` is released as 0.2.0, pinning `Cluster` 1.0.0.

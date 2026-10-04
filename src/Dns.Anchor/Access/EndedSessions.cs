@@ -2,7 +2,7 @@ using System.Globalization;
 
 using Microsoft.Data.Sqlite;
 
-using TheKrystalShip.KGSM.Auth.Cluster;
+using TheKrystalShip.Auth.Cluster;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 
