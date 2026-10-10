@@ -13,7 +13,7 @@ asks it.
 <game>.play.example.com           a game server — players connect here, directly
 ```
 
-Authority for the design is `cluster-dns-plan.md` in the workspace.
+Authority for the design is `../kgsm-docs/systems/cluster/dns.md`.
 
 ## Why the names differ per server
 

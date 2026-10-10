@@ -1,13 +1,11 @@
 # CLAUDE.md — kgsm-dns
 
-Guidance for working in this repo. The design's authority is `cluster-dns-plan.md` at the workspace
-root; this file is how the code implementing it is laid out and what must stay true of it.
-
-## What this is
-
 One cluster anchor (`kgsm-dns`, Native AOT, systemd) holding the `dns` capability, plus one package
 (`TheKrystalShip.KGSM.Dns`) that every member compiles against. The anchor is the only member holding
-a credential for the zone. Every other member asks it for a name.
+a credential for the zone. Every other member asks it for a name. What it owns, who it depends on and
+the contracts it takes part in: `../kgsm-docs/components/kgsm-dns.md`; the design:
+`../kgsm-docs/systems/cluster/dns.md` and `../kgsm-docs/decisions/0029-names-assigned-at-runtime.md`.
+This file is how the code is laid out and what must stay true of it.
 
 ```
 src/Dns/          the names, the bus messages, and a member's half: naming, certificates, serving
