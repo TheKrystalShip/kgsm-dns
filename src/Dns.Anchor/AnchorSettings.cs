@@ -75,8 +75,8 @@ internal sealed class AnchorSettings
     public string NodesBase { get; set; } = "nodes";
 
     /// <summary>The label capabilities are named under.</summary>
-    /// <panel>The part of the domain capabilities are named under. With anchors, the cluster's sign-in
-    /// is reached at something like auth.anchors.example.com.</panel>
+    /// <panel>The part of the domain capabilities are named under. With anchors, the cluster's DNS anchor
+    /// is reached at something like dns.anchors.example.com.</panel>
     [ConfigField("anchorsBase", "Capabilities are named under", Group = "naming",
         Risk = ConfigRisk.Destructive)]
     public string AnchorsBase { get; set; } = "anchors";

@@ -67,38 +67,68 @@ public sealed class CapabilityNameTests : IDisposable
     [Fact]
     public async Task Every_held_capability_is_named_at_the_host_its_holder_stated()
     {
-        _registry.StateHost("auth-anchor", "friend.ddns.net");
+        _registry.StateHost("assistant-anchor", "friend.ddns.net");
 
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
         Assert.Equal(SelfHost, _provider.Find(NameOf("dns"))!.Content);
-        Assert.Equal("friend.ddns.net", _provider.Find(NameOf("auth"))!.Content);
-        Assert.Equal(new RecordMark(NameKind.Capability, "auth-anchor", "auth"), _provider.Find(NameOf("auth"))!.Mark);
+        Assert.Equal("friend.ddns.net", _provider.Find(NameOf("assistant"))!.Content);
+        Assert.Equal(new RecordMark(NameKind.Capability, "assistant-anchor", "assistant"), _provider.Find(NameOf("assistant"))!.Mark);
+    }
+
+    [Fact]
+    public async Task The_accounts_capability_is_never_named()
+    {
+        // The sign-in provider serves its own name at the address its deployment sets.
+        _registry.StateHost("auth-provider", "friend.ddns.net");
+
+        Sync(Held("dns", Self), Held(ClusterCapability.Auth, "auth-provider"));
+        await _reconciler.RunAsync(CancellationToken.None);
+
+        Assert.Null(_registry.Find(NameOf(ClusterCapability.Auth)));
+        Assert.Null(_provider.Find(NameOf(ClusterCapability.Auth)));
+    }
+
+    [Fact]
+    public async Task A_name_the_accounts_capability_already_held_is_withdrawn()
+    {
+        _registry.StateHost("auth-provider", "friend.ddns.net");
+        NameService names = new(_registry, Bases, new MemberNamePool(["walter"], new Dictionary<string, string>()),
+            NullLogger<NameService>.Instance);
+        names.ClaimCapability(ClusterCapability.Auth, "auth-provider", "friend.ddns.net");
+        await _reconciler.RunAsync(CancellationToken.None);
+        Assert.NotNull(_provider.Find(NameOf(ClusterCapability.Auth)));
+
+        IReadOnlySet<string> touched = Sync(Held("dns", Self), Held(ClusterCapability.Auth, "auth-provider"));
+        await _reconciler.RunAsync(CancellationToken.None);
+
+        Assert.Contains("auth-provider", touched);
+        Assert.Null(_provider.Find(NameOf(ClusterCapability.Auth)));
     }
 
     [Fact]
     public async Task A_holder_that_has_not_said_where_it_is_reached_publishes_nothing()
     {
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
-        NameRow row = _registry.Find(NameOf("auth"))!;
+        NameRow row = _registry.Find(NameOf("assistant"))!;
         Assert.Equal(NameState.Blocked, row.State);
         Assert.NotEmpty(row.Note);
-        Assert.Null(_provider.Find(NameOf("auth")));
+        Assert.Null(_provider.Find(NameOf("assistant")));
     }
 
     [Fact]
     public async Task A_holder_stating_it_has_no_public_host_publishes_nothing()
     {
-        _registry.StateHost("auth-anchor", "");
+        _registry.StateHost("assistant-anchor", "");
 
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
-        Assert.Equal(NameState.Blocked, _registry.Find(NameOf("auth"))!.State);
-        Assert.Null(_provider.Find(NameOf("auth")));
+        Assert.Equal(NameState.Blocked, _registry.Find(NameOf("assistant"))!.State);
+        Assert.Null(_provider.Find(NameOf("assistant")));
     }
 
     [Fact]
@@ -106,8 +136,8 @@ public sealed class CapabilityNameTests : IDisposable
     {
         // The anchor that rebuilds its registry from the zone after taking the capability has heard from
         // nobody yet. Its first pass must not withdraw every name the cluster is reached at.
-        _registry.StateHost("auth-anchor", "friend.ddns.net");
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        _registry.StateHost("assistant-anchor", "friend.ddns.net");
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
         var rebuilt = new SqliteNameRegistry(Path.Combine(
@@ -121,11 +151,11 @@ public sealed class CapabilityNameTests : IDisposable
             rebuilt,
             UnreadState());
 
-        capabilities.Sync([Held("dns", Self), Held("auth", "auth-anchor")], Self, SelfHost);
+        capabilities.Sync([Held("dns", Self), Held("assistant", "assistant-anchor")], Self, SelfHost);
         RecordReconciler.Pass pass = await reconciler.RunAsync(CancellationToken.None);
 
         Assert.Equal(0, pass.Removed);
-        Assert.Equal("friend.ddns.net", _provider.Find(NameOf("auth"))!.Content);
+        Assert.Equal("friend.ddns.net", _provider.Find(NameOf("assistant"))!.Content);
     }
 
     [Fact]
@@ -176,35 +206,35 @@ public sealed class CapabilityNameTests : IDisposable
     [Fact]
     public async Task A_holder_changing_its_host_moves_the_record()
     {
-        _registry.StateHost("auth-anchor", "friend.ddns.net");
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        _registry.StateHost("assistant-anchor", "friend.ddns.net");
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
-        _registry.StateHost("auth-anchor", "elsewhere.ddns.net");
-        IReadOnlySet<string> touched = Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        _registry.StateHost("assistant-anchor", "elsewhere.ddns.net");
+        IReadOnlySet<string> touched = Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
         await _reconciler.RunAsync(CancellationToken.None);
 
-        Assert.Equal(["auth-anchor"], touched);
-        Assert.Equal("elsewhere.ddns.net", _provider.Find(NameOf("auth"))!.Content);
+        Assert.Equal(["assistant-anchor"], touched);
+        Assert.Equal("elsewhere.ddns.net", _provider.Find(NameOf("assistant"))!.Content);
     }
 
     [Fact]
     public void Nothing_changed_touches_nobody()
     {
-        _registry.StateHost("auth-anchor", "friend.ddns.net");
-        Sync(Held("dns", Self), Held("auth", "auth-anchor"));
+        _registry.StateHost("assistant-anchor", "friend.ddns.net");
+        Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));
 
-        Assert.Empty(Sync(Held("dns", Self), Held("auth", "auth-anchor")));
+        Assert.Empty(Sync(Held("dns", Self), Held("assistant", "assistant-anchor")));
     }
 
     [Fact]
     public void Never_stated_and_stated_none_are_different_answers()
     {
-        Assert.Null(_registry.HostOf("auth-anchor"));
+        Assert.Null(_registry.HostOf("assistant-anchor"));
 
-        _registry.StateHost("auth-anchor", "");
+        _registry.StateHost("assistant-anchor", "");
 
-        Assert.Equal("", _registry.HostOf("auth-anchor"));
-        Assert.Equal(["auth-anchor"], _registry.StatedMembers());
+        Assert.Equal("", _registry.HostOf("assistant-anchor"));
+        Assert.Equal(["assistant-anchor"], _registry.StatedMembers());
     }
 }

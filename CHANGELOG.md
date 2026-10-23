@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the accounts capability has no name (0.18.0)
+
+- The anchor never names the `auth` capability: its holder is the sign-in provider, which serves the one
+  address its own deployment sets. A name it held is withdrawn on the next pass, and an alias for it is
+  refused, since an alias needs a capability this cluster names.
+
 ### Changed — built on tks-auth's packages (0.17.2)
 
 - The anchor takes `TheKrystalShip.Auth` 5.0.0, `Auth.Cluster` 2.0.0 and `Auth.Access` 2.0.0, the auth

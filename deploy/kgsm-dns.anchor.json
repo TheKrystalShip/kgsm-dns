@@ -121,7 +121,7 @@
       "key": "anchorsBase",
       "env": "Dns__AnchorsBase",
       "label": "Capabilities are named under",
-      "description": "The part of the domain capabilities are named under. With anchors, the cluster's sign-in is reached at something like auth.anchors.example.com.",
+      "description": "The part of the domain capabilities are named under. With anchors, the cluster's DNS anchor is reached at something like dns.anchors.example.com.",
       "group": "naming",
       "type": "string",
       "default": "anchors",
