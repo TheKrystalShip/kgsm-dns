@@ -62,7 +62,20 @@ public sealed record DnsPort(int Start, int End, string Protocol);
 /// <param name="Instance">The instance id, which the engine mints at install and never changes.</param>
 /// <param name="Blueprint">The game it runs; its name is suggested from this.</param>
 /// <param name="Ports">Every port it declares.</param>
-public sealed record DnsInstance(string Instance, string Blueprint, IReadOnlyList<DnsPort> Ports);
+/// <param name="Inherits">The game server this one continues, set while a transfer's record exists on the
+/// node holding the continuation. Omitted from the wire when null.</param>
+public sealed record DnsInstance(
+    string Instance, string Blueprint, IReadOnlyList<DnsPort> Ports,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DnsInheritance? Inherits = null);
+
+/// <summary>The game server an instance continues: the member and instance it came from, and its game name.</summary>
+/// <remarks>
+/// The anchor reads it only for an instance that holds no name yet, so restating it changes nothing.
+/// </remarks>
+/// <param name="Member">The member the previous server ran on.</param>
+/// <param name="Instance">The previous server's instance id.</param>
+/// <param name="Name">The game name it held, or null when it held none.</param>
+public sealed record DnsInheritance(string Member, string Instance, string? Name);
 
 /// <summary>Every game server on one node.</summary>
 /// <param name="Instances">The complete set. An empty list is a node with none installed.</param>
@@ -138,6 +151,7 @@ public sealed record DnsNames(IReadOnlyList<DnsNameEntry> Names);
 [JsonSerializable(typeof(DnsCert))]
 [JsonSerializable(typeof(DnsRenew))]
 [JsonSerializable(typeof(DnsInstances))]
+[JsonSerializable(typeof(DnsInheritance))]
 [JsonSerializable(typeof(DnsCollision))]
 public sealed partial class DnsJsonContext : JsonSerializerContext
 {

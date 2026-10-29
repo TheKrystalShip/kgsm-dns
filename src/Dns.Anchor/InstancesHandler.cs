@@ -78,7 +78,7 @@ internal sealed class InstancesHandler(
                 continue;
 
             keep.Add(instance.Instance);
-            NameRow row = names.ClaimGame(envelope.From, instance.Instance, instance.Blueprint ?? "");
+            NameRow row = names.ClaimGame(envelope.From, instance.Instance, instance.Blueprint ?? "", instance.Inherits);
 
             // Kept beside the name for what the ports are read for: which servers on one public address
             // want the same one.

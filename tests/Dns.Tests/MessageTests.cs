@@ -1,11 +1,12 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using TheKrystalShip.KGSM.Dns.Member;
 using TheKrystalShip.KGSM.Dns.Messages;
 
 namespace TheKrystalShip.KGSM.Dns.Tests;
 
-public sealed class MessageTests
+public sealed partial class MessageTests
 {
     [Fact]
     public void A_statement_round_trips_in_camel_case()
@@ -40,6 +41,54 @@ public sealed class MessageTests
         Assert.Equal(34197, read.Instances[0].Ports[0].Start);
         Assert.Equal("udp", read.Instances[0].Ports[0].Protocol);
     }
+
+    [Fact]
+    public void An_inheritance_round_trips_and_is_omitted_from_the_wire_when_absent()
+    {
+        var inherited = new DnsInstance(
+            "factorio-9", "factorio", [], new DnsInheritance("node-a", "factorio-1", "factorio.play.example.com"));
+        var plain = new DnsInstance("factorio-1", "factorio", []);
+
+        string withJson = JsonSerializer.Serialize(new DnsInstances([inherited]), DnsJsonContext.Default.DnsInstances);
+        string withoutJson = JsonSerializer.Serialize(new DnsInstances([plain]), DnsJsonContext.Default.DnsInstances);
+        DnsInstances read = JsonSerializer.Deserialize(withJson, DnsJsonContext.Default.DnsInstances)!;
+
+        Assert.Contains("\"inherits\":{\"member\":\"node-a\",\"instance\":\"factorio-1\"", withJson);
+        Assert.DoesNotContain("inherits", withoutJson);
+        Assert.Equal(inherited.Inherits, read.Instances[0].Inherits);
+    }
+
+    [Fact]
+    public void A_message_without_an_inheritance_reads_with_none()
+    {
+        DnsInstances read = JsonSerializer.Deserialize(
+            "{\"instances\":[{\"instance\":\"factorio-1\",\"blueprint\":\"factorio\",\"ports\":[]}]}",
+            DnsJsonContext.Default.DnsInstances)!;
+
+        Assert.Null(read.Instances[0].Inherits);
+    }
+
+    [Fact]
+    public void A_reader_of_the_old_shape_ignores_the_inheritance_it_does_not_know()
+    {
+        // An anchor that predates the field reads the same message through a context with the same
+        // options and no such member; the unknown property is skipped, not refused.
+        var sent = new DnsInstances([new DnsInstance(
+            "factorio-9", "factorio", [], new DnsInheritance("node-a", "factorio-1", null))]);
+        string json = JsonSerializer.Serialize(sent, DnsJsonContext.Default.DnsInstances);
+
+        OldInstances? read = JsonSerializer.Deserialize(json, OldShapeContext.Default.OldInstances);
+
+        Assert.Equal("factorio-9", read!.Instances[0].Instance);
+    }
+
+    private sealed record OldInstance(string Instance, string Blueprint);
+
+    private sealed record OldInstances(IReadOnlyList<OldInstance> Instances);
+
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSerializable(typeof(OldInstances))]
+    private sealed partial class OldShapeContext : JsonSerializerContext;
 
     [Fact]
     public void A_game_server_is_reached_at_its_name_only_once_published_and_is_never_served()

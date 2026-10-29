@@ -52,6 +52,14 @@ same game already holds the name anywhere in the cluster (`factorio`, `factorio-
 missing from the set has been uninstalled and loses its name. A game name is an alias of its node's
 name, so it follows the node wherever the node's own name points.
 
+A server that continues another one (a transfer's target) says so with `inherits`: the member and
+instance it came from and the game name that one held. For an instance that holds no name yet, the anchor
+re-keys the name held for the previous `(member, instance)` to the new one, its aliases with it, and the
+record at the provider is edited in place; else it assigns the stated name when it sits directly under the
+play base and is free; else it names the server as a fresh install. An instance that already holds a name
+ignores `inherits`, so restating it changes nothing, and the previous node's later list, which no longer
+has the instance, finds nothing of its own to release.
+
 Nodes behind one router share one public address and one port space. On every zone pass the anchor
 resolves each node's host and flags every pair of servers on different nodes that share an address and
 declare an overlapping port on the same protocol, on both, telling each node about its own. The names

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 
 using TheKrystalShip.KGSM.Dns;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
+using TheKrystalShip.KGSM.Dns.Messages;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Names;
 
@@ -146,13 +147,19 @@ public sealed class NameService(
     /// <param name="member">The node the server is on.</param>
     /// <param name="instance">The instance id.</param>
     /// <param name="blueprint">The game it runs.</param>
-    public NameRow ClaimGame(string member, string instance, string blueprint)
+    /// <param name="inherits">The server this one continues. Read only while the instance holds no name:
+    /// the name keyed on the previous server moves to this one, aliases with it; failing that, the name the
+    /// previous server held is taken when it is free; failing that, the server is named as a fresh install.</param>
+    public NameRow ClaimGame(string member, string instance, string blueprint, DnsInheritance? inherits = null)
     {
         lock (_gate)
         {
             NameRow? existing = registry.FindFor(NameKind.Game, member, instance);
             if (existing is not null)
                 return RetargetGameLocked(existing);
+
+            if (inherits is not null && InheritLocked(member, instance, inherits) is { } inherited)
+                return inherited;
 
             string label = DnsLabel.FirstFree(DnsLabel.Sanitize(blueprint), candidate =>
                 registry.Holds(bases.Compose(NameKind.Game, candidate)));
@@ -170,6 +177,50 @@ public sealed class NameService(
             logger.LogInformation("{Instance} on {Member} is named {Name}", instance, member, row.Name);
             return row;
         }
+    }
+
+    private NameRow? InheritLocked(string member, string instance, DnsInheritance inherits)
+    {
+        // Re-key what the previous server holds. A blocked fallback name is no name worth carrying.
+        NameRow? previous = string.IsNullOrEmpty(inherits.Member) || string.IsNullOrEmpty(inherits.Instance)
+            ? null
+            : registry.FindFor(NameKind.Game, inherits.Member, inherits.Instance);
+
+        if (previous is not null && !previous.Name.StartsWith("unnamed-", StringComparison.Ordinal))
+        {
+            // The mark follows the key, so the record at the provider is edited in place and never
+            // withdrawn: the name resolves throughout.
+            NameRow moved = Save(PlayRow(previous.Name, NameKind.Game, member, instance) with
+            {
+                RecordId = previous.RecordId,
+            });
+
+            foreach (NameRow alias in registry.OfKind(NameKind.Alias)
+                         .Where(a => a.Member == inherits.Member && a.Key == inherits.Instance))
+            {
+                Save(PlayRow(alias.Name, NameKind.Alias, member, instance) with { RecordId = alias.RecordId });
+            }
+
+            logger.LogInformation(
+                "{Instance} on {Member} continues {Previous} on {PreviousMember} and takes {Name}",
+                instance, member, inherits.Instance, inherits.Member, moved.Name);
+            return moved;
+        }
+
+        // The previous server's name, once released and not taken since. Only a game name directly under the
+        // play base qualifies: a member cannot name anything else by stating it here.
+        if (!string.IsNullOrEmpty(inherits.Name)
+            && bases.LabelOf(NameKind.Game, inherits.Name) is { Length: > 0 } label
+            && DnsLabel.Sanitize(label) == label
+            && !label.StartsWith("unnamed-", StringComparison.Ordinal)
+            && !registry.Holds(inherits.Name))
+        {
+            NameRow named = Save(PlayRow(inherits.Name, NameKind.Game, member, instance));
+            logger.LogInformation("{Instance} on {Member} takes {Name}, which {Previous} held", instance, member, named.Name, inherits.Instance);
+            return named;
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -83,7 +84,7 @@ public static class DnsMemberServiceCollectionExtensions
     /// Only a node hosts game servers, so only a node registers this. Requires
     /// <see cref="AddKgsmDnsMember"/>, and an <see cref="IDnsInstanceSource"/> reading the node's engine.
     /// </remarks>
-    public static IServiceCollection AddKgsmDnsGameNames<TSource>(this IServiceCollection services)
+    public static IServiceCollection AddKgsmDnsGameNames<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TSource>(this IServiceCollection services)
         where TSource : class, IDnsInstanceSource
     {
         services.AddSingleton<IDnsInstanceSource, TSource>();

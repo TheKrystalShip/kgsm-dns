@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — a game name passes to the server that continues it (0.19.0, package 0.3.0-dev.1)
+
+- `DnsInstance` carries an optional `Inherits` (`DnsInheritance`: member, instance, game name), omitted
+  from the wire when null. For an instance holding no name, the anchor re-keys the name held for the
+  previous (member, instance), aliases included; else assigns the stated name when it is a free game name
+  in the play base; else names the instance as a fresh install. An older anchor ignores the field.
+- `AddKgsmDnsGameNames` annotates its type argument for trimming, which clears the IL2091 warning.
+
 ### Changed — the accounts capability has no name (0.18.0)
 
 - The anchor never names the `auth` capability: its holder is the sign-in provider, which serves the one
