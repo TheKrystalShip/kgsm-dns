@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
-using TheKrystalShip.Auth.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Status;
 using TheKrystalShip.KGSM.Dns.Status;
@@ -32,7 +31,7 @@ public sealed class DnsOperationsTests
         Assert.Contains(m.Operations, o => o is { Method: "GET", Route: DnsStatusRoutes.Events, Action: DnsActions.JournalRead });
         Assert.Contains(m.Operations, o => o is { Method: "POST", Route: DnsStatusRoutes.ZoneCheck, Action: DnsActions.ZoneCheck });
         Assert.Contains(m.Operations, o => o is { Method: "POST", Route: DnsStatusRoutes.Aliases, Action: DnsActions.AliasesWrite });
-        Assert.All(m.Operations, o => Assert.Equal(Operation.Scopes.Cluster, o.Scope));
+        Assert.All(m.Operations, o => Assert.Equal(Operation.ClusterScope, o.Scope));
     }
 
     [Fact]

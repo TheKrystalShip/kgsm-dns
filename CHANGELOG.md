@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — admits people on the provider's access tokens (0.20.0)
+
+- The browser surface checks the bearer token against the provider's keys through
+  `TheKrystalShip.KGSM.Sessions` 1.0.0-dev.1, and a route admits a token listing its `dns:*` action. The
+  provider is `Sessions__Issuer` and `Sessions__Audience`, set once per host in
+  `/etc/kgsm/kgsm-cluster.env` and declared in the settings file and the generated descriptor. With no
+  issuer the gated routes answer `503 sessions_unconfigured`.
+- Removed: the gossip key reading, the `session.revoke` handler and its ended-sessions table, the
+  anchor's authority replica (`Dns:AccountsPath`, `Dns:SessionsPath`), `AuthorityReporter` and every
+  `TheKrystalShip.Auth.*` package reference. A role change reaches a person at their next token renewal.
+- `/me/access` and `/operations` keep their shapes, answered from the token with cluster-wide actions.
+
 ### Added — a game name passes to the server that continues it (0.19.0, package 0.3.0-dev.1)
 
 - `DnsInstance` carries an optional `Inherits` (`DnsInheritance`: member, instance, game name), omitted

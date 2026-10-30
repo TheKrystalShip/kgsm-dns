@@ -45,20 +45,14 @@ internal static class StatusEndpoints
     {
         // Cast to Delegate so each binds as a route handler, whose returned result is what is sent. Bound as
         // a request delegate — the overload a lone HttpContext parameter picks — the result is discarded.
-        app.MapGet(DnsStatusRoutes.Status, (Delegate)StatusAsync).WithMetadata(new DnsAction(DnsActions.NamesRead));
-        app.MapGet(DnsStatusRoutes.Events, (Delegate)EventsAsync).WithMetadata(new DnsAction(DnsActions.JournalRead));
+        app.MapGet(DnsStatusRoutes.Status, (Delegate)StatusAsync).Gated(DnsActions.NamesRead);
+        app.MapGet(DnsStatusRoutes.Events, (Delegate)EventsAsync).Gated(DnsActions.JournalRead);
     }
 
     private static async Task<IResult> StatusAsync(HttpContext context)
     {
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
-
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsAction.Of(context), ct)
-                .ConfigureAwait(false) is { } refusal)
-        {
-            return refusal;
-        }
 
         DnsStatus status = await BuildAsync(services, ct).ConfigureAwait(false);
         return Results.Json(status, DnsStatusJsonContext.Default.DnsStatus);
@@ -197,12 +191,6 @@ internal static class StatusEndpoints
     {
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
-
-        if (await services.GetRequiredService<ClusterBearer>().RefuseAsync(context.Request, DnsAction.Of(context), ct)
-                .ConfigureAwait(false) is { } refusal)
-        {
-            return refusal;
-        }
 
         int limit = int.TryParse(context.Request.Query["limit"], NumberStyles.Integer, CultureInfo.InvariantCulture,
             out int asked) && asked > 0

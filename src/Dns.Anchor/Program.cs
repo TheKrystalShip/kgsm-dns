@@ -1,6 +1,3 @@
-using Microsoft.Extensions.Caching.Memory;
-
-using TheKrystalShip.Auth.Cluster;
 using TheKrystalShip.KGSM.Cluster;
 using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
@@ -16,6 +13,7 @@ using TheKrystalShip.KGSM.Dns.Anchor.Status;
 using TheKrystalShip.KGSM.Dns.Member;
 using TheKrystalShip.KGSM.Dns.Serving;
 using TheKrystalShip.KGSM.Extensions;
+using TheKrystalShip.KGSM.Sessions;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -141,48 +139,15 @@ builder.Services.AddSingleton<ICertificateRequester, OwnCertificateRequester>();
 builder.Services.AddSingleton<CertificateKeeper>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateKeeper>());
 
-// A person's browser using this anchor's page. It signs in once, at the member holding `auth`; the
-// session verifies here against the key that member publishes, and what the person may do is evaluated
-// from this anchor's own replica of the authority that member publishes. Every piece is the shared one
-// every member verifies and evaluates with, and inert outside a cluster: no holder is heard of, no key
-// is learned, and every session is refused as unverifiable.
-builder.Services.AddMemoryCache();
-
-// The replica is this member's alone: it lives in this anchor's state directory, shares no file with any
-// other member on the machine, and is filled by the snapshot on joining and every change after.
-builder.Services.AddSingleton<IReplicatedAuthority>(sp => new OwnedReplicaFile(
-    sp.GetRequiredService<AnchorOptions>().AccountsPath, sp.GetRequiredService<ILogger<OwnedReplicaFile>>()));
-builder.Services.AddAuthorityReplica();
-builder.Services.AddSingleton<MemberAccess>();
-
-// What this anchor performs, told to the holder of the accounts: its own manifest, where the deploy
-// installs it, which is what makes its dns:* actions something a role can hold.
-builder.Services.AddSingleton(new AuthorityReporterOptions
-{
-    ManifestFiles = ["/var/lib/kgsm/anchors/actions/dns-anchor.json"],
-});
-builder.Services.AddSingleton<AuthorityReporter>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AuthorityReporter>());
-
-builder.Services.AddSingleton<ClusterSessionKeys>();
-builder.Services.AddSingleton<IClusterSessionKeys>(sp => sp.GetRequiredService<ClusterSessionKeys>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<ClusterSessionKeys>());
-
-// A sign-out elsewhere, announced over the bus, refused here from then on. The record is kept for as long
-// as a session somebody could still present is bounded by, which is the longest a person stays signed in.
-builder.Services.AddSingleton<EndedSessions>();
-builder.Services.AddSingleton<IClusterSessionDenyList>(sp => sp.GetRequiredService<EndedSessions>());
-builder.Services.AddSingleton(sp => new ClusterSessionRevocations(
-    sp.GetRequiredService<IClusterSessionDenyList>(),
-    sp.GetRequiredService<IMemoryCache>(),
-    TimeSpan.FromSeconds(5)));
-builder.Services.AddSingleton<IClusterMessageHandler>(sp => new SessionRevokeHandler(
-    sp.GetRequiredService<IClusterSessionDenyList>(),
-    sp.GetRequiredService<ClusterSessionRevocations>(),
-    TimeSpan.FromDays(30),
-    sp.GetRequiredService<ILogger<SessionRevokeHandler>>()));
-
-builder.Services.AddSingleton<ClusterBearer>();
+// A person's browser using this anchor's page. The anchor signs nobody in: it checks each bearer token
+// against the keys of the provider named by Sessions__Issuer and Sessions__Audience, and a route admits a
+// token listing the route's dns:* action. With no issuer configured nothing here can be verified, so the
+// gated routes answer 503 rather than admit anyone.
+SessionsSettings sessionSettings =
+    builder.Configuration.GetSection(SessionsSettings.Section).Get<SessionsSettings>() ?? new SessionsSettings();
+bool sessionsConfigured = !string.IsNullOrWhiteSpace(sessionSettings.Issuer);
+if (sessionsConfigured)
+    builder.Services.AddKgsmSessions();
 
 // The Control Panel is served from another origin, with a bearer and never a cookie. The writes below
 // need POST and DELETE and a JSON body.
@@ -194,6 +159,28 @@ builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
 WebApplication app = builder.Build();
 
 app.UseCors();
+
+if (sessionsConfigured)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
+else
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>() is not null)
+        {
+            await Results.Json(
+                new AnchorError("sessions_unconfigured", "This anchor has no sign-in provider configured."),
+                AnchorJsonContext.Default.AnchorError, statusCode: StatusCodes.Status503ServiceUnavailable)
+                .ExecuteAsync(context);
+            return;
+        }
+
+        await next();
+    });
+}
 
 // The member wire: the inbox other members deliver to, and the handshake a join is performed through.
 // Served by the package rather than spelled out here, so every member answers the same routes.

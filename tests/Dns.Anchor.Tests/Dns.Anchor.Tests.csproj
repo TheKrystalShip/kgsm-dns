@@ -25,6 +25,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Dns.Anchor/Anchor.csproj" />
+    <PackageReference Include="TheKrystalShip.KGSM.Sessions.Testing" Version="1.0.0-dev.1" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>

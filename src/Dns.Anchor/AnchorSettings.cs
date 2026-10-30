@@ -180,25 +180,36 @@ internal sealed class AnchorSettings
         Risk = ConfigRisk.Wiring)]
     public string AllowedOrigins { get; set; } = "";
 
-    /// <summary>Where this anchor keeps its replica of the cluster's authority.</summary>
-    /// <panel>This anchor's own replica of the cluster's accounts, roles and grants, filled by the member
-    /// that holds them. It is what decides who may do what on this page, read afresh on every
-    /// request.</panel>
-    [ConfigField("accountsPath", "Authority replica", Group = "storage", Type = ConfigType.Path,
-        Risk = ConfigRisk.Wiring)]
-    public string AccountsPath { get; set; } = "/var/lib/kgsm-dns/accounts.db";
-
-    /// <summary>Where this anchor records sessions ended elsewhere in the cluster.</summary>
-    /// <panel>The sessions somebody signed out of elsewhere in the cluster, kept so this anchor refuses
-    /// them too until they would have expired.</panel>
-    [ConfigField("sessionsPath", "Ended sessions", Group = "storage", Type = ConfigType.Path,
-        Risk = ConfigRisk.Safe)]
-    public string SessionsPath { get; set; } = "/var/lib/kgsm-dns/sessions.db";
-
     /// <summary>Where the descriptor this build wrote is installed.</summary>
     /// <panel>The file describing what this anchor can be configured with, written by its own build and
     /// installed by its deploy. It is read to render this page; absent, there is no page.</panel>
     [ConfigField("configDescriptorPath", "Config descriptor", Group = "storage", Type = ConfigType.Path,
         Risk = ConfigRisk.Wiring)]
     public string ConfigDescriptorPath { get; set; } = "/var/lib/kgsm/anchors/dns-anchor.json";
+}
+
+/// <summary>
+/// The sign-in provider whose tokens this anchor admits, bound from the "Sessions" section. Both values
+/// are host-level, set once for every component on the machine in <c>/etc/kgsm/kgsm-cluster.env</c>
+/// (<c>Sessions__Issuer</c>, <c>Sessions__Audience</c>).
+/// </summary>
+[ConfigSection(Section)]
+internal sealed class SessionsSettings
+{
+    /// <summary>The configuration section this binds from.</summary>
+    public const string Section = "Sessions";
+
+    /// <summary>The provider's issuer, exactly as its tokens carry it.</summary>
+    /// <panel>The sign-in provider this anchor admits people from, as its tokens name it. It is the same
+    /// for every component on this machine, set in the shared cluster environment file. Blank, nobody
+    /// is admitted to this anchor's page.</panel>
+    [ConfigField("sessionsIssuer", "Sign-in provider", Group = "access", Risk = ConfigRisk.Wiring)]
+    public string Issuer { get; set; } = "";
+
+    /// <summary>The audience the cluster's tokens are minted for.</summary>
+    /// <panel>The audience the cluster's access tokens are minted for; a token for any other is refused.
+    /// It is the same for every component on this machine, set in the shared cluster environment
+    /// file.</panel>
+    [ConfigField("sessionsAudience", "Token audience", Group = "access", Risk = ConfigRisk.Wiring)]
+    public string Audience { get; set; } = "";
 }

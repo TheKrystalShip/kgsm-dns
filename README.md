@@ -94,13 +94,13 @@ through the same entitlement checks the zone pass itself runs under.
 | `GET /api/v1/cluster/dns` | the whole picture as one `DnsStatus`: this member's standing (holder or standing by, configured, zone, bases, cadence, issuer), the zone's health (last pass, its duration, error and what it changed, next pass, contested names), every name with its target, state, block reason, declared ports, cross-member port collisions and — for an alias — the game name it follows, every member with where it said it is reached, when, and what that resolved to, and every certificate order with its expiry, when it will next be renewed, and the counts issued and failed in the last week |
 | `GET /api/v1/cluster/dns/events?limit=` | the newest lines of the anchor's own event journal, newest first, as the journal holds them |
 
-A caller presents the session the cluster's auth anchor minted. It verifies here against the key that
-member publishes through gossip, and what the person may do is evaluated on every request from the
-anchor's own replica of the cluster's authority — the names need `dns:names.read`, the journal
-`dns:journal.read`; a disabled account is signed out, and a session ended elsewhere is refused from the
-moment the announcement arrives. A refusal names the action. An anchor that has not yet heard the key
-answers `503 cannot_verify`, and one whose replica cannot be read `503 authority_unavailable`, rather
-than `401`. `GET /me/access` lists the `dns:*` actions the caller holds. The Control Panel's origin is listed in `AllowedOrigins`.
+A caller presents the access token of the sign-in provider named by `Sessions__Issuer` and
+`Sessions__Audience`. The anchor checks it against the provider's published keys, and what the person may
+do is the `dns:*` actions the token lists — the names need `dns:names.read`, the journal
+`dns:journal.read`. A missing or invalid token is `401`, and a token without the route's action is `403`
+naming it. A role change reaches a person at their next token renewal. With no issuer configured the
+gated routes answer `503 sessions_unconfigured`. `GET /me/access` lists the `dns:*` actions the token
+holds. The Control Panel's origin is listed in `AllowedOrigins`.
 
 Unknown is never reported as none. A pass that has not run, a host that did not resolve, a collision
 that could not be checked and a certificate issued before anything recorded it are all null.

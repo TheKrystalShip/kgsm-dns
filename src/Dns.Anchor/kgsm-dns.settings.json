@@ -69,17 +69,20 @@
     "RegistryPath": "/var/lib/kgsm-dns/names.db",
     "ClusterStorePath": "/var/lib/kgsm-dns/cluster.db",
 
-    // Who may do what on this anchor's page. A browser signs in once, at the member holding the cluster's
-    // accounts, and its session is verified here against that member's published key; what the person
-    // may do is evaluated from this anchor's own replica of the authority on every request, and a session
-    // ended elsewhere is recorded so it is refused here too. The origins are the Control Panel's.
+    // The browser origins allowed to read this anchor's page. The Control Panel's.
     "AllowedOrigins": "https://kgsm.thekrystalship.com",
-    "AccountsPath": "/var/lib/kgsm-dns/accounts.db",
-    "SessionsPath": "/var/lib/kgsm-dns/sessions.db",
 
     // The descriptor this build wrote, as the deploy installs it. Read to render this anchor's own
     // configuration page; absent, there is no page.
     "ConfigDescriptorPath": "/var/lib/kgsm/anchors/dns-anchor.json"
+  },
+
+  // Who may do what on this anchor's page. A browser signs in at the provider, and this anchor checks the
+  // bearer token it presents against the provider's published keys; the person's dns:* actions are the
+  // token's. Both values are host-level and come from /etc/kgsm/kgsm-cluster.env.
+  "Sessions": {
+    "Issuer": "",
+    "Audience": ""
   },
 
   // The framework's own request logging is a line per call, and this daemon calls the provider on

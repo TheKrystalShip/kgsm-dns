@@ -42,4 +42,6 @@ internal sealed record AnchorError(string Error, string Message);
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(AnchorIdentity))]
 [JsonSerializable(typeof(AnchorError))]
+[JsonSerializable(typeof(Access.DnsAccessReport))]
+[JsonSerializable(typeof(Access.OperationManifest))]
 internal sealed partial class AnchorJsonContext : JsonSerializerContext;

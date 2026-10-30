@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-using TheKrystalShip.Auth;
 using TheKrystalShip.KGSM.Cluster;
 using TheKrystalShip.KGSM.Cluster.Membership;
 using TheKrystalShip.KGSM.Cluster.Messaging;
@@ -12,6 +11,7 @@ using TheKrystalShip.KGSM.Dns.Anchor.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 using TheKrystalShip.KGSM.Dns.Messages;
+using TheKrystalShip.KGSM.Sessions;
 using TheKrystalShip.KGSM.Dns.Serving;
 using TheKrystalShip.KGSM.Dns.Status;
 
@@ -42,10 +42,10 @@ internal static class AdminEndpoints
 {
     public static void Map(WebApplication app)
     {
-        app.MapPost(DnsStatusRoutes.ZoneCheck, (Delegate)ZoneCheckAsync).WithMetadata(new DnsAction(DnsActions.ZoneCheck));
-        app.MapPost(DnsStatusRoutes.CertificateRenew, (Delegate)RenewAsync).WithMetadata(new DnsAction(DnsActions.CertificatesRenew));
-        app.MapPost(DnsStatusRoutes.Aliases, (Delegate)AddAliasAsync).WithMetadata(new DnsAction(DnsActions.AliasesWrite));
-        app.MapDelete(DnsStatusRoutes.Alias, (Delegate)RemoveAliasAsync).WithMetadata(new DnsAction(DnsActions.AliasesWrite));
+        app.MapPost(DnsStatusRoutes.ZoneCheck, (Delegate)ZoneCheckAsync).Gated(DnsActions.ZoneCheck);
+        app.MapPost(DnsStatusRoutes.CertificateRenew, (Delegate)RenewAsync).Gated(DnsActions.CertificatesRenew);
+        app.MapPost(DnsStatusRoutes.Aliases, (Delegate)AddAliasAsync).Gated(DnsActions.AliasesWrite);
+        app.MapDelete(DnsStatusRoutes.Alias, (Delegate)RemoveAliasAsync).Gated(DnsActions.AliasesWrite);
     }
 
     private static async Task<IResult> ZoneCheckAsync(HttpContext context)
@@ -53,16 +53,14 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
-        if (admission.Refusal is { } refusal)
-            return refusal;
+        string actor = KgsmPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
 
         services.GetRequiredService<ClusterMembershipWorker>().RequestZonePass();
         await services.GetRequiredService<DnsJournal>()
-            .ZoneCheckRequestedAsync(admission.Identity!.ActorString, ct).ConfigureAwait(false);
+            .ZoneCheckRequestedAsync(actor, ct).ConfigureAwait(false);
         return Results.Accepted();
     }
 
@@ -71,9 +69,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
-        if (admission.Refusal is { } refusal)
-            return refusal;
+        string actor = KgsmPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -111,7 +107,7 @@ internal static class AdminEndpoints
         }
 
         await services.GetRequiredService<DnsJournal>()
-            .RenewRequestedAsync(name, row.Member, admission.Identity!.ActorString, ct).ConfigureAwait(false);
+            .RenewRequestedAsync(name, row.Member, actor, ct).ConfigureAwait(false);
         return Results.Accepted();
     }
 
@@ -120,9 +116,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
-        if (admission.Refusal is { } refusal)
-            return refusal;
+        string actor = KgsmPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -176,7 +170,7 @@ internal static class AdminEndpoints
 
         services.GetRequiredService<ClusterMembershipWorker>().RequestZonePass();
         await services.GetRequiredService<DnsJournal>()
-            .AliasAddedAsync(name, server.Name, admission.Identity!.ActorString, ct).ConfigureAwait(false);
+            .AliasAddedAsync(name, server.Name, actor, ct).ConfigureAwait(false);
 
         var status = new DnsNameStatus(
             Name: alias.Name, Kind: NameKinds.Spell(alias.Kind), Member: alias.Member, Key: alias.Key,
@@ -190,9 +184,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        ClusterBearer.Admission admission = await Authorize(services, context, ct).ConfigureAwait(false);
-        if (admission.Refusal is { } refusal)
-            return refusal;
+        string actor = KgsmPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -213,14 +205,11 @@ internal static class AdminEndpoints
         services.GetRequiredService<NameService>().Release(name);
         services.GetRequiredService<ClusterMembershipWorker>().RequestZonePass();
         await services.GetRequiredService<DnsJournal>()
-            .AliasRemovedAsync(name, server, admission.Identity!.ActorString, ct).ConfigureAwait(false);
+            .AliasRemovedAsync(name, server, actor, ct).ConfigureAwait(false);
 
         return Results.NoContent();
     }
 
-    // The action is the one the route declares, which is also what this anchor publishes for it.
-    private static Task<ClusterBearer.Admission> Authorize(IServiceProvider services, HttpContext context, CancellationToken ct) =>
-        services.GetRequiredService<ClusterBearer>().AuthorizeAsync(context.Request, DnsAction.Of(context), ct);
 
     /// <summary>
     /// Whether this member is configured and holds the capability, so it is safe to write. Refusing before
