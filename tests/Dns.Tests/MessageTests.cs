@@ -144,9 +144,9 @@ public sealed partial class MessageTests
     {
         var book = new DnsNameBook();
 
-        book.Replace([new DnsNameEntry("auth.anchors.example.com", "capability", "auth", "published", "")]);
+        book.Replace([new DnsNameEntry("assistant.anchors.example.com", "capability", "assistant", "published", "")]);
 
-        Assert.Equal(["auth.anchors.example.com"], book.Published);
+        Assert.Equal(["assistant.anchors.example.com"], book.Published);
         Assert.Null(book.NodeName);
     }
 
@@ -167,7 +167,7 @@ public sealed partial class MessageTests
     {
         var book = new DnsNameBook();
 
-        book.Replace([new DnsNameEntry("auth.anchors.example.com", "capability", "auth", "published", "")]);
+        book.Replace([new DnsNameEntry("assistant.anchors.example.com", "capability", "assistant", "published", "")]);
 
         Assert.Null(book.NodeName);
     }

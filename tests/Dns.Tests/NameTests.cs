@@ -70,7 +70,7 @@ public sealed class ClusterBasesTests
     public void Each_kind_composes_under_its_own_base()
     {
         Assert.Equal("jessie.nodes.example.com", Bases.Compose(NameKind.Member, "jessie"));
-        Assert.Equal("auth.anchors.example.com", Bases.Compose(NameKind.Capability, "auth"));
+        Assert.Equal("assistant.anchors.example.com", Bases.Compose(NameKind.Capability, "assistant"));
         Assert.Equal("minecraft.play.example.com", Bases.Compose(NameKind.Game, "minecraft"));
         Assert.Equal("smp.play.example.com", Bases.Compose(NameKind.Alias, "smp"));
     }

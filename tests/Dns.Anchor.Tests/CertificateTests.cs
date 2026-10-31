@@ -70,7 +70,7 @@ public sealed class SigningRequestCheckTests
     {
         // The issuer would certify every name the zone can prove, so a second name would be a
         // certificate for somebody else's name.
-        byte[] der = Request("CN=walter.nodes.example.com", "walter.nodes.example.com", "auth.anchors.example.com");
+        byte[] der = Request("CN=walter.nodes.example.com", "walter.nodes.example.com", "assistant.anchors.example.com");
 
         Assert.NotNull(SigningRequestCheck.Refusal(der, "walter.nodes.example.com"));
     }
@@ -83,7 +83,7 @@ public sealed class SigningRequestCheckTests
     [Fact]
     public void A_request_whose_subject_names_something_else_is_refused() =>
         Assert.NotNull(SigningRequestCheck.Refusal(
-            Request("CN=auth.anchors.example.com", "walter.nodes.example.com"), "walter.nodes.example.com"));
+            Request("CN=assistant.anchors.example.com", "walter.nodes.example.com"), "walter.nodes.example.com"));
 
     [Fact]
     public void A_request_altered_after_it_was_signed_is_refused()

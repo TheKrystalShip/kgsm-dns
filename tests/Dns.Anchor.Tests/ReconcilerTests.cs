@@ -307,10 +307,10 @@ public sealed class ReconcilerTests : IDisposable
     [Fact]
     public async Task A_capability_points_at_its_holders_host()
     {
-        NameRow capability = _names.ClaimCapability("auth", "anchor-a", "home.ddns.net");
+        NameRow capability = _names.ClaimCapability("assistant", "anchor-a", "home.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
-        Assert.Equal(Bases.Compose(NameKind.Capability, "auth"), capability.Name);
+        Assert.Equal(Bases.Compose(NameKind.Capability, "assistant"), capability.Name);
         ProviderRecord published = _provider.Find(capability.Name)!;
         Assert.Equal("CNAME", published.Type);
         Assert.Equal("home.ddns.net", published.Content);
@@ -328,15 +328,15 @@ public sealed class ReconcilerTests : IDisposable
     [Fact]
     public async Task Reassigning_a_capability_moves_its_name_to_the_new_holder()
     {
-        _names.ClaimCapability("auth", "anchor-a", "home.ddns.net");
+        _names.ClaimCapability("assistant", "anchor-a", "home.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
-        NameRow moved = _names.ClaimCapability("auth", "anchor-b", "friend.ddns.net");
+        NameRow moved = _names.ClaimCapability("assistant", "anchor-b", "friend.ddns.net");
         await _reconciler.RunAsync(CancellationToken.None);
 
         Assert.Equal("anchor-b", moved.Member);
         Assert.Equal("friend.ddns.net", _provider.Find(moved.Name)!.Content);
-        Assert.Equal(new RecordMark(NameKind.Capability, "anchor-b", "auth"), _provider.Find(moved.Name)!.Mark);
+        Assert.Equal(new RecordMark(NameKind.Capability, "anchor-b", "assistant"), _provider.Find(moved.Name)!.Mark);
     }
 
     [Fact]

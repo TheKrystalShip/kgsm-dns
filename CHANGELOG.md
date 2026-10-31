@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — every capability is named (0.21.0)
+
+- `CapabilityNames.Unnamed` is deleted: the cluster no longer carries an accounts capability, so every
+  held capability has a name. Built on `TheKrystalShip.KGSM.Cluster` 2.0.0 and
+  `TheKrystalShip.KGSM.ComponentConfig` 4.0.0. The action manifest is served by the node at
+  `/.well-known/tks-actions.json`.
+
 ### Changed — admits people on the provider's access tokens (0.20.0)
 
 - The browser surface checks the bearer token against the provider's keys through

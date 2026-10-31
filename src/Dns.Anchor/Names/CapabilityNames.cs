@@ -5,8 +5,8 @@ using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 namespace TheKrystalShip.KGSM.Dns.Anchor.Names;
 
 /// <summary>
-/// Keeps one name under the anchors base for every capability the cluster assigns, except those in
-/// <see cref="Unnamed"/>, pointing at whoever holds it, and every alias somebody gave a capability pointing
+/// Keeps one name under the anchors base for every capability the cluster assigns, pointing at whoever
+/// holds it, and every alias somebody gave a capability pointing
 /// at the same place.
 /// </summary>
 /// <remarks>
@@ -25,13 +25,6 @@ namespace TheKrystalShip.KGSM.Dns.Anchor.Names;
 /// </remarks>
 public sealed class CapabilityNames(NameService names, SqliteNameRegistry registry, ClusterStateStore state)
 {
-    /// <summary>
-    /// The capabilities given no name. The accounts capability's holder is the sign-in provider, which is
-    /// reached at the one address its own deployment sets and serves that name itself; a second name for
-    /// it would be a page a sign-in could start on and never finish.
-    /// </summary>
-    public static readonly IReadOnlySet<string> Unnamed = new HashSet<string>(StringComparer.Ordinal) { ClusterCapability.Auth };
-
     /// <summary>
     /// Bring every capability name to the assignments this member currently holds a copy of.
     /// </summary>
@@ -54,7 +47,7 @@ public sealed class CapabilityNames(NameService names, SqliteNameRegistry regist
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
         var held = new HashSet<string>(StringComparer.Ordinal);
-        foreach (ClusterAssignment assignment in assignments.Where(a => a.IsHeld && !Unnamed.Contains(a.Capability)))
+        foreach (ClusterAssignment assignment in assignments.Where(a => a.IsHeld))
         {
             held.Add(assignment.Capability);
 
@@ -76,8 +69,8 @@ public sealed class CapabilityNames(NameService names, SqliteNameRegistry regist
                 touched.Add(previous.Member);
         }
 
-        // A capability nobody holds has nobody to point at, and an unnamed one has no name. Either name
-        // goes rather than resolving to the member that last held it.
+        // A capability nobody holds has nobody to point at. Its name goes rather than resolving to the
+        // member that last held it.
         foreach (NameRow orphan in before.Values.Where(r => !held.Contains(r.Key)))
         {
             names.Release(orphan.Name);

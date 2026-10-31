@@ -28,7 +28,7 @@
   <ItemGroup>
     <!-- The bus, the roster and the capability assignment a node's half of the exchange rides on.
          Every consumer is already a cluster member, so this adds nothing a consumer does not carry. -->
-    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="1.0.0" />
+    <PackageReference Include="TheKrystalShip.KGSM.Cluster" Version="2.0.0" />
   </ItemGroup>
 
   <ItemGroup>

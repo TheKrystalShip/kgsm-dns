@@ -78,36 +78,6 @@ public sealed class CapabilityNameTests : IDisposable
     }
 
     [Fact]
-    public async Task The_accounts_capability_is_never_named()
-    {
-        // The sign-in provider serves its own name at the address its deployment sets.
-        _registry.StateHost("auth-provider", "friend.ddns.net");
-
-        Sync(Held("dns", Self), Held(ClusterCapability.Auth, "auth-provider"));
-        await _reconciler.RunAsync(CancellationToken.None);
-
-        Assert.Null(_registry.Find(NameOf(ClusterCapability.Auth)));
-        Assert.Null(_provider.Find(NameOf(ClusterCapability.Auth)));
-    }
-
-    [Fact]
-    public async Task A_name_the_accounts_capability_already_held_is_withdrawn()
-    {
-        _registry.StateHost("auth-provider", "friend.ddns.net");
-        NameService names = new(_registry, Bases, new MemberNamePool(["walter"], new Dictionary<string, string>()),
-            NullLogger<NameService>.Instance);
-        names.ClaimCapability(ClusterCapability.Auth, "auth-provider", "friend.ddns.net");
-        await _reconciler.RunAsync(CancellationToken.None);
-        Assert.NotNull(_provider.Find(NameOf(ClusterCapability.Auth)));
-
-        IReadOnlySet<string> touched = Sync(Held("dns", Self), Held(ClusterCapability.Auth, "auth-provider"));
-        await _reconciler.RunAsync(CancellationToken.None);
-
-        Assert.Contains("auth-provider", touched);
-        Assert.Null(_provider.Find(NameOf(ClusterCapability.Auth)));
-    }
-
-    [Fact]
     public async Task A_holder_that_has_not_said_where_it_is_reached_publishes_nothing()
     {
         Sync(Held("dns", Self), Held("assistant", "assistant-anchor"));

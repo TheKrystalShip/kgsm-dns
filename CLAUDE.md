@@ -22,9 +22,6 @@ component becoming something else.
   aliases at its node's name. A host is a hostname (a `CNAME`, normally a dynamic-DNS name) or a
   public address; `PublicHost` refuses anything nobody outside could reach, and anything inside the
   cluster's own bases.
-- **The accounts capability is never named** (`CapabilityNames.Unnamed`). Its holder is the sign-in
-  provider, which serves the one address its own deployment sets; a second name for it is a page a
-  sign-in can start on and never finish, because the provider's callback returns to its own address.
 - **Only nodes hold node names.** An anchor is reached by its capability, so a machine carries one node
   name however many anchors run on it. A pinned name is reserved for its member before it joins.
 - **Nothing outside the three bases is written, except a capability alias somebody named under `dns:aliases.write`.**
