@@ -32,9 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Same advisory, same reasoning as every member's: a native SQLite library the cluster package
-         pulls in, where the flagged version is the latest published build. -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+    <!-- Build-time only: the Cluster package brings a native SQLite library, and this pin makes the build
+         resolve a bundle that advisory GHSA-2m69-gcr7-jv3q does not cover. It does not flow to consumers,
+         which pin their own. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

@@ -17,6 +17,9 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
+    <!-- The package under test brings a native SQLite library through Cluster; the bundle is pinned to a
+         build the advisory GHSA-2m69-gcr7-jv3q does not cover. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -25,12 +28,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Dns/Dns.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Same advisory, same reasoning as the package under test. A suppression does not flow across a
-         project reference, so the consumer declares it too. -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
 
   <ItemGroup>

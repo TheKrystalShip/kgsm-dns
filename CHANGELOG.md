@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — a patched SQLite native library (0.21.1)
+
+`SQLitePCLRaw.bundle_e_sqlite3` is pinned at a build whose native SQLite library the advisory
+GHSA-2m69-gcr7-jv3q does not cover, and the audit suppressions are gone. The daemon pins it for what it
+ships; the `Dns` package and its tests pin it for their own builds only, so the package's contract is
+unchanged.
+
 ### Changed — every capability is named (0.21.0)
 
 - `CapabilityNames.Unnamed` is deleted: the cluster no longer carries an accounts capability, so every
