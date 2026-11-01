@@ -104,6 +104,12 @@ else
     ENV_SEEDED=0
 fi
 
+# ── 2a. The configuration this project's units read ──────────────────────────
+# Defined in deploy-common.sh's PROJECT BLOCK; a project with nothing to configure leaves it out.
+if declare -F setup_project_config >/dev/null; then
+    setup_project_config
+fi
+
 # ── 2b. The shared leaf-descriptor directory ──────────────────────────────────
 # Where this component declares its configurable surface. Two directories, because a leaf and an
 # anchor are different things: a leaf is one this node runs and kgsm-api scans for, an anchor serves

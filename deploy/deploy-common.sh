@@ -6,9 +6,10 @@
 # deploy/deploy.sh (the headless code delivery). Every path, unit name and user lives here
 # exactly once, so the two entry points can never disagree about what this project installs.
 #
-# This file is vendored per repo — each kgsm-* repo carries its own copy so a standalone clone
-# deploys with no umbrella checkout present. The canonical source is
-# tks/scripts/deploy-template/; edit the PROJECT BLOCK below and leave the rest alone.
+# This file is vendored per repo — each repo carries its own copy so a standalone clone deploys with
+# no umbrella checkout present. The canonical source is tks/scripts/deploy-template/. A repo's own
+# lines are its PROJECT BLOCK and, at the end, its PROJECT HELPERS; everything else is the template's,
+# written by the template's vendor.sh and checked by `vendor.sh --check`.
 #
 # Not executable on its own.
 
@@ -353,6 +354,22 @@ PY
         fi
     fi
 
+    # A component that declares another namespace's actions has one more manifest per namespace,
+    # <name>.<namespace>.actions.json beside the descriptor, installed as <namespace>.json.
+    local stem="${LEAF_DESCRIPTOR%.json}" extra space
+    stem="${stem%.*}"
+    for extra in "${stem}".*.actions.json; do
+        [[ -f "$extra" ]] || continue
+        space="${extra#"${stem}".}"
+        space="${space%.actions.json}"
+        [[ "$space" == leaf || "$space" == anchor ]] && continue
+        install -d -m 0755 "${dir}/actions"
+        if ! cmp -s "$extra" "${dir}/actions/${space}.json"; then
+            log "action manifest changed → ${dir}/actions/${space}.json"
+            install -m 0644 "$extra" "${dir}/actions/${space}.json"
+        fi
+    done
+
     # A component that has changed kind leaves its old files behind, and a stale descriptor in the
     # leaves directory is read as a leaf however the component now describes itself.
     local other_dir
@@ -365,3 +382,5 @@ PY
         fi
     done
 }
+
+# ── PROJECT HELPERS — this project's own functions, if any, below this line ────
