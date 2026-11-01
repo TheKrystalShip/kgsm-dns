@@ -17,6 +17,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="TheKrystalShip.Testing" Version="1.0.0-dev.1" />
     <!-- The package under test brings a native SQLite library through Cluster; the bundle is pinned to a
          build the advisory GHSA-2m69-gcr7-jv3q does not cover. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
