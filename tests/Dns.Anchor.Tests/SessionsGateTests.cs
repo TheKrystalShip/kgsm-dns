@@ -10,15 +10,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using TheKrystalShip.KGSM.Dns.Anchor.Access;
-using TheKrystalShip.KGSM.Sessions;
-using TheKrystalShip.KGSM.Sessions.Testing;
+using TheKrystalShip.Auth.Sessions;
+using TheKrystalShip.Auth.Sessions.Testing;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Tests;
 
 /// <summary>A browser reaching this anchor with the provider's access token: the token's actions decide.</summary>
 public sealed class SessionsGateTests : IAsyncLifetime
 {
-    private readonly TestIssuer _issuer = new();
+    private const string Audience = "kgsm";
+
+    private readonly TestIssuer _issuer = new(Audience);
     private WebApplication _app = null!;
     private HttpClient _client = null!;
 
@@ -29,9 +31,9 @@ public sealed class SessionsGateTests : IAsyncLifetime
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Sessions:Issuer"] = TestIssuer.DefaultIssuer,
-            ["Sessions:Audience"] = TestIssuer.DefaultAudience,
+            ["Sessions:Audience"] = Audience,
         });
-        builder.Services.AddKgsmSessions();
+        builder.Services.AddSessions();
         _issuer.UseTestIssuer(builder.Services);
 
         _app = builder.Build();

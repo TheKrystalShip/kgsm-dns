@@ -14,7 +14,7 @@
 
     <RootNamespace>TheKrystalShip.KGSM.Dns.Anchor</RootNamespace>
     <AssemblyName>kgsm-dns</AssemblyName>
-    <Version>0.21.1</Version>
+    <Version>0.21.2</Version>
 
     <!-- The config descriptor is generated from AnchorSettings by TheKrystalShip.KGSM.ComponentConfig.
          These name the two files it works between; the attribute source, the documentation file the
@@ -53,7 +53,7 @@
 
     <!-- Who may do what with this anchor. It signs nobody in: it checks each bearer token against the
          provider's published keys and reads the person's dns:* actions from the token. -->
-    <PackageReference Include="TheKrystalShip.KGSM.Sessions" Version="1.0.0-dev.1" />
+    <PackageReference Include="TheKrystalShip.Auth.Sessions" Version="1.0.0-dev.1" />
   </ItemGroup>
 
   <ItemGroup>

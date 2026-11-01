@@ -11,7 +11,7 @@ using TheKrystalShip.KGSM.Dns.Anchor.Access;
 using TheKrystalShip.KGSM.Dns.Anchor.Names;
 using TheKrystalShip.KGSM.Dns.Anchor.Registry;
 using TheKrystalShip.KGSM.Dns.Messages;
-using TheKrystalShip.KGSM.Sessions;
+using TheKrystalShip.Auth.Sessions;
 using TheKrystalShip.KGSM.Dns.Serving;
 using TheKrystalShip.KGSM.Dns.Status;
 
@@ -53,7 +53,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        string actor = KgsmPerson.Of(context)!.DisplayName;
+        string actor = SessionPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -69,7 +69,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        string actor = KgsmPerson.Of(context)!.DisplayName;
+        string actor = SessionPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -116,7 +116,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        string actor = KgsmPerson.Of(context)!.DisplayName;
+        string actor = SessionPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);
@@ -184,7 +184,7 @@ internal static class AdminEndpoints
         IServiceProvider services = context.RequestServices;
         CancellationToken ct = context.RequestAborted;
 
-        string actor = KgsmPerson.Of(context)!.DisplayName;
+        string actor = SessionPerson.Of(context)!.DisplayName;
 
         if (!await IsHolderReadyAsync(services, ct).ConfigureAwait(false))
             return NotConfiguredOrRefusal(services);

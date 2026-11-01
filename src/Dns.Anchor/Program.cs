@@ -13,7 +13,7 @@ using TheKrystalShip.KGSM.Dns.Anchor.Status;
 using TheKrystalShip.KGSM.Dns.Member;
 using TheKrystalShip.KGSM.Dns.Serving;
 using TheKrystalShip.KGSM.Extensions;
-using TheKrystalShip.KGSM.Sessions;
+using TheKrystalShip.Auth.Sessions;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -147,7 +147,7 @@ SessionsSettings sessionSettings =
     builder.Configuration.GetSection(SessionsSettings.Section).Get<SessionsSettings>() ?? new SessionsSettings();
 bool sessionsConfigured = !string.IsNullOrWhiteSpace(sessionSettings.Issuer);
 if (sessionsConfigured)
-    builder.Services.AddKgsmSessions();
+    builder.Services.AddSessions();
 
 // The Control Panel is served from another origin, with a bearer and never a cookie. The writes below
 // need POST and DELETE and a JSON body.

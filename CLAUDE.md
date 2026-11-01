@@ -81,7 +81,7 @@ component becoming something else.
   the caller holds of them. Each route declares its action as `DnsAction` metadata, which its handler
   reads to enforce and `GET /operations` (`Access/DnsOperations`) publishes, so a client names no
   `dns:*` action of its own; a route checking an action it does not declare is one no client can see.
-  The routes are admitted by `TheKrystalShip.KGSM.Sessions`: the bearer token is checked against the
+  The routes are admitted by `TheKrystalShip.Auth.Sessions`: the bearer token is checked against the
   provider's keys (`Sessions__Issuer`, `Sessions__Audience`, declared by `SessionsSettings` and set once
   per host in `/etc/kgsm/kgsm-cluster.env`), and a route admits a token listing its action (`Gated` in
   `Access/DnsOperations`). With no issuer the gated routes answer 503. The actions are declared in

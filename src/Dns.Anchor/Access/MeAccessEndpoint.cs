@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 using Microsoft.AspNetCore.Http;
 
-using TheKrystalShip.KGSM.Sessions;
+using TheKrystalShip.Auth.Sessions;
 
 namespace TheKrystalShip.KGSM.Dns.Anchor.Access;
 
@@ -22,10 +22,10 @@ internal static class MeAccessEndpoint
     public static void Map(WebApplication app) =>
         app.MapGet(Path, (Delegate)Handle).RequirePerson();
 
-    internal static IResult Handle(HttpContext context) => Results.Json(ReportFor(KgsmPerson.Of(context)!),
+    internal static IResult Handle(HttpContext context) => Results.Json(ReportFor(SessionPerson.Of(context)!),
         AnchorJsonContext.Default.DnsAccessReport);
 
-    internal static DnsAccessReport ReportFor(KgsmPerson person) =>
+    internal static DnsAccessReport ReportFor(SessionPerson person) =>
         new(Current: true,
             Cluster: [.. person.Actions
                 .Where(a => a.StartsWith(DnsActions.Namespace + ":", StringComparison.Ordinal))
